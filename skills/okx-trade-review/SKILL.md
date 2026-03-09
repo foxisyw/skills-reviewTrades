@@ -109,8 +109,19 @@ Extract from user message:
 
 ### Step 2: Fetch Data via MCP Tools
 
-Call the appropriate MCP tools. See [references/mcp-tools.md](references/mcp-tools.md) for
-full parameter and return field documentation.
+> **MANDATORY**: Before making MCP calls, read `${CLAUDE_SKILL_DIR}/references/mcp-tools.md`
+> for exact parameter names, return field schemas, and rate limits.
+> Do not guess parameters from memory — OKX field names are specific.
+
+**Quick reference — key MCP tool parameters:**
+- `account_get_positions_history`: instType, instId, posId, type (1=close long, 2=close short, 3=liq long, 4=liq short), limit (max 100), after (paginate by posId)
+- `swap_get_fills`: instId, archive (**MUST be true for >3 days old**), begin/end (ms timestamps), limit (max 100), after (paginate by tradeId)
+- `swap_get_orders`: instId, status ("history" for closed), limit (max 100), after (paginate by ordId). Has tpTriggerPx/slTriggerPx for TP/SL.
+- `account_get_bills`: type ("8"=funding fee), begin/end (ms), limit (max 100), after (paginate by billId)
+- `market_get_candles`: instId (required), bar ("1H","4H","1D"), limit (max 100). Returns `[ts, o, h, l, c, vol, ...]`
+- `system_get_capabilities`: no params → returns { modules, authenticated, demo, profile }
+
+**Critical**: All OKX values are returned as **strings**. Always parseFloat() before computing.
 
 **Mode → MCP tool mapping:**
 
@@ -138,7 +149,16 @@ Warn user: "正在獲取交易記錄，可能需要一些時間..."
 
 **Parse all string values to numbers** (OKX returns everything as strings).
 
-Compute metrics using formulas from [references/formulas.md](references/formulas.md).
+**Core formulas (always apply these exactly):**
+- `win_rate = count(realizedPnl > 0) / total_trades`
+- `profit_factor = sum(pnl where > 0) / abs(sum(pnl where < 0))` — >1.75 good, >2.5 excellent
+- `expectancy = (win_rate × avg_winner) + ((1 - win_rate) × avg_loser)`
+- `max_drawdown`: track running equity peak; `dd[i] = equity[i] - peak[i]`; report most negative
+- `sharpe = mean(daily_returns) / stdev(daily_returns) × sqrt(365)` — crypto = 365 days, risk-free = 0
+- `R_multiple = realized_pnl / (abs(entry_price - slTriggerPx) × position_size)` — N/A if no SL set
+
+> **MANDATORY**: For advanced formulas (Sortino, Calmar, SQN, Kelly, slippage, concentration HHI),
+> read `${CLAUDE_SKILL_DIR}/references/formulas.md` before computing. Do not approximate from memory.
 
 For each position, extract:
 ```
@@ -174,7 +194,13 @@ breakdown by instrument.
 **PATTERN**: segment positions by instrument, direction, leverage bucket (1-3x/3-5x/5-10x/10-20x/20x+),
 hold duration (<1h/1-4h/4-12h/12-24h/1-3d/>3d), session (Asian 00-08/European 08-16/US 16-00 UTC).
 
-Format output using templates from [references/output-templates.md](references/output-templates.md).
+**Output structure per mode:**
+Every output starts with `## {Mode} — {context} [{DEMO|LIVE}]` header.
+Use markdown tables for data. Use backtick-wrapped `` `── Section ──` `` dividers between sections.
+Bold all key numbers. End every output with `` `── Next Steps ──` `` offering 2-3 drill-down suggestions.
+
+> **MANDATORY**: For complete per-mode templates (SINGLE, PERIOD, RISK, EXECUTION, COST, PATTERN, JOURNAL),
+> read `${CLAUDE_SKILL_DIR}/references/output-templates.md` before formatting output.
 
 **Formatting rules:**
 - Use **markdown formatting** (bold, headers, lists) as the primary structure
