@@ -194,38 +194,115 @@ breakdown by instrument.
 **PATTERN**: segment positions by instrument, direction, leverage bucket (1-3x/3-5x/5-10x/10-20x/20x+),
 hold duration (<1h/1-4h/4-12h/12-24h/1-3d/>3d), session (Asian 00-08/European 08-16/US 16-00 UTC).
 
-**Output structure per mode:**
-Every output starts with `## {Mode} — {context} [{DEMO|LIVE}]` header.
-Use markdown tables for data. Use backtick-wrapped `` `── Section ──` `` dividers between sections.
-Bold all key numbers. End every output with `` `── Next Steps ──` `` offering 2-3 drill-down suggestions.
-
-> **MANDATORY**: For complete per-mode templates (SINGLE, PERIOD, RISK, EXECUTION, COST, PATTERN, JOURNAL),
-> read `${CLAUDE_SKILL_DIR}/references/output-templates.md` before formatting output.
-
 **Formatting rules:**
-- Use **markdown formatting** (bold, headers, lists) as the primary structure
-- Section separators: wrap in backticks, e.g. `` `── Section Name ──────────────────` ``
-- Monetary values: USD(T), `+`/`-` prefix, 2 decimal places, comma thousands
-- Percentages: 1 decimal place
-- Tables: use markdown tables (pipe `|` format), NOT box-drawing characters
-- Sparklines: block elements (▁▂▃▄▅▆▇█) — safe in inline text
-- Risk scores: filled/empty blocks (▓░), scale 1-10
-- Bar charts: use `█` blocks inline with text
-- Markers: `[+]` strength, `[-]` weakness, `[!]` warning
-- Equity curves: simple ASCII using `-`, `/`, `\`, `_` — avoid complex box-drawing
-- Always bold key numbers: **+$1,234.56**, **61.5%**, **2.25x**
+- Use **markdown** (bold, headers, lists) as the primary structure
+- Section separators: `` `── Section Name ──────────────────` `` (backtick-wrapped)
+- Monetary: USD(T), `+`/`-` prefix, 2 decimal places, comma thousands
+- Percentages: 1 decimal place. Bold key numbers: **+$1,234.56**, **61.5%**
+- Tables: markdown pipe `|` format. Sparklines: ▁▂▃▄▅▆▇█. Bar charts: █ blocks
+- Risk scores: ▓░ blocks, scale 1-10. Markers: `[+]` strength, `[-]` weakness, `[!]` warning
+
+**REQUIRED output sections by mode (follow this order exactly):**
+
+#### PERIOD sections:
+1. `## Period Summary — {dates} [{DEMO|LIVE}]`
+2. Summary: **{n}** trades | Net PnL: **{+/-}${pnl}**
+3. Winners/losers table with counts + amounts
+4. `── Key Metrics ──` table: profit factor, expectancy, avg winner/loser, win/loss ratio, largest win/loss, max consec wins/losses
+5. `── Daily P&L ──` sparkline: ▅▃▁▆▇█▃ with values in parentheses
+6. `── By Instrument ──` table: instrument, trades, net PnL, win rate
+7. `── By Direction ──` Long vs Short with trades, win%, PnL, █ bars
+8. `── Costs ──` Trading fees + Funding + Total (% of gross win)
+9. `── Next Steps ──` 2-3 suggestions (SINGLE, RISK, PATTERN)
+
+#### SINGLE sections:
+1. `## Trade Review — {instId} [{DEMO|LIVE}]`
+2. Position table: direction, leverage, entry/exit, size, margin mode
+3. `── P&L Breakdown ──` table: price PnL, fees, funding, liq penalty, **net realized**
+4. `── Risk Metrics ──` R-multiple, initial risk, reward:risk, leverage risk %
+5. `── Price Action ──` simple ASCII chart with entry/exit/SL markers
+6. `── Execution ──` fills count, maker/taker %, slippage bps, close type
+7. `── Assessment ──` [+] strengths, [-] weaknesses, [!] warnings
+8. `── Next Steps ──`
+
+#### RISK sections:
+1. Header, 2. Risk scores with ▓░ bars (overall / leverage / concentration / sizing / drawdown, each X/10),
+3. Leverage profile (avg, max, distribution by bucket), 4. Drawdown (max DD, duration, Sharpe, Sortino),
+5. Concentration by instrument, 6. Liquidation events, 7. [!] Recommendations, 8. Next Steps
+
+#### EXECUTION sections:
+1. Header, 2. Maker/taker breakdown with █ bars, 3. Fee impact (rebate vs cost, savings potential),
+4. Slippage analysis (entry/exit avg bps, worst), 5. Order type usage, 6. Recommendations
+
+#### COST sections:
+1. Header, 2. Summary (total, cost/volume bps, cost/PnL %), 3. Breakdown with █ bars (fees/funding/liq),
+4. Trading fee detail (maker rebate vs taker), 5. Funding impact, 6. By instrument, 7. Optimization tips
+
+#### PATTERN sections:
+1. Header, 2. By instrument table (trades, PnL, win rate, PF), 3. By direction with █ bars,
+4. By leverage bucket, 5. By hold duration, 6. By session (Asian/European/US),
+7. Top 3 findings, 8. Insights [+][-][!]
+
+#### JOURNAL:
+Markdown table: date, instrument, dir, lever, entry, exit, PnL, PnL%, duration. TOTAL row at bottom.
+On request: CSV or JSON. Always include all positions in time range.
+
+---
+
+**Concrete PERIOD example (follow this format):**
+
+## Period Summary — Mar 01 to Mar 07 [DEMO]
+
+**11** trades | Net PnL: **+$9,833.03**
+
+| | Count | Amount |
+|---|---|---|
+| Winners | 5 (45.5%) | +$11,179 |
+| Losers | 6 (54.5%) | -$1,346 |
+
+`── Key Metrics ──────────────────────────────────`
+
+| Metric | Value |
+|--------|-------|
+| Profit Factor | **7.51** |
+| Expectancy | **+$893.91** / trade |
+| Avg Winner | +$2,235.86 |
+| Avg Loser | -$224.35 |
+| Largest Win | +$5,420.12 (BTC, Mar 03) |
+| Max Consec Win/Loss | 3 / 2 |
+
+`── Daily P&L ────────────────────────────────────`
+▅▁▃▇█▂▃ (+1,200 -340 +680 +3,200 +5,420 -280 +553)
+
+`── By Instrument ────────────────────────────────`
+
+| Instrument | Trades | Net PnL | Win Rate |
+|---|---|---|---|
+| BTC-USDT-SWAP | 9 | **+$9,836.27** | 44% |
+| SOL-USDT-SWAP | 1 | +$0.98 | 100% |
+| ETH-USDT-SWAP | 1 | -$4.22 | 0% |
+
+`── By Direction ─────────────────────────────────`
+- **Long**: 7 trades, 57% win, **+$8,200** ████████████████████
+- **Short**: 4 trades, 25% win, **+$1,633** ████████
+
+`── Costs ────────────────────────────────────────`
+- Trading Fees: **-$45.67**
+- Funding Costs: **-$12.30**
+- Total: **-$57.97** (0.5% of gross win)
+
+`── Next Steps ───────────────────────────────────`
+→ "查看最大那筆BTC交易的詳情" (SINGLE)
+→ "檢查風險指標和回撤" (RISK)
+→ "分析做多做空的模式" (PATTERN)
+
+---
+
+> Note: For extended per-mode template examples, see `references/output-templates.md` if file access is available.
 
 ### Step 4: Recommend Continuations
 
-End every output with 2-3 suggested next actions:
-
-```
-── Next Steps ─────────────────────────────────
-→ "查看最差那筆交易的詳情" (SINGLE)
-→ "檢查風險指標" (RISK)
-→ "分析交易模式" (PATTERN)
-```
-
+End every output with `── Next Steps ──` offering 2-3 suggested actions.
 Tailor to results (high costs → suggest COST; concentrated → suggest RISK).
 
 ---
