@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "okx-DEMO-simulated-trading": {
+      "command": "okx-trade-mcp",
+      "args": ["--profile", "demo", "--modules", "account,swap,market"]
+    }
+  }
+}

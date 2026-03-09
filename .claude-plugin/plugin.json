@@ -1,0 +1,8 @@
+{
+  "name": "okx-trade-review",
+  "version": "1.0.0",
+  "description": "Post-mortem analysis (複盤) of OKX trading history via MCP. Reviews closed positions, computes win rate / profit factor / drawdown / Sharpe, identifies trading patterns, and exports trade journals.",
+  "skills": ["./skills/"],
+  "mcpServers": "./.mcp.json",
+  "keywords": ["skills", "okx", "trading", "review", "post-mortem", "mcp", "複盤"]
+}

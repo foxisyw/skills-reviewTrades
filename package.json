@@ -1,0 +1,26 @@
+{
+  "name": "okx-trade-review-skill",
+  "version": "1.0.0",
+  "description": "OKX Trade Post-Mortem Skill — structured review of trading history via MCP",
+  "keywords": [
+    "okx",
+    "trading",
+    "mcp",
+    "skill",
+    "post-mortem",
+    "claude",
+    "claude-code-plugin"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/foxisyw/skills-reviewTrades"
+  },
+  "files": [
+    ".claude-plugin/",
+    ".mcp.json",
+    "skills/",
+    "README.md",
+    "LICENSE"
+  ]
+}
