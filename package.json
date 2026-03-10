@@ -1,7 +1,7 @@
 {
   "name": "okx-trade-review-skill",
-  "version": "1.0.0",
-  "description": "OKX Trade Post-Mortem Skill — structured review of trading history via MCP",
+  "version": "2.0.0",
+  "description": "Deep markdown-first OKX trade review skill with market-context enrichment and export artifacts",
   "keywords": [
     "okx",
     "trading",
@@ -20,6 +20,7 @@
     ".claude-plugin/",
     ".mcp.json",
     "skills/",
+    "tasks/",
     "README.md",
     "LICENSE"
   ]

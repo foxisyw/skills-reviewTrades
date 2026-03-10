@@ -1,466 +1,312 @@
 # Output Templates for Trade Review
 
-These templates guide the AI agent's output formatting. Use **markdown** as the
-primary structure — it renders reliably in Claude Code's terminal UI.
+These templates define the canonical markdown layouts for `okx-trade-review`.
+They are optimized for narrow chat windows and browserless environments.
 
-Key principles:
-- Use markdown headers (`##`, `###`) for sections
-- Use backtick-wrapped separators for visual dividers: `` `── Section ────────` ``
-- Use markdown tables (`| col |`) instead of box-drawing tables
-- Sparklines (▁▂▃▄▅▆▇█) and bar blocks (█▓░) are safe inline
-- Bold key numbers: **+$1,234.56**, **61.5%**
-- Always show `[DEMO]` or `[LIVE]` in the top header
+## Global Rules
 
----
+- Use markdown headings, bullets, short tables, sparklines, and 10-character bars.
+- Avoid box-drawing frames in main chat output.
+- Avoid wide ledgers or tables with more than 4 columns in main chat output.
+- Lead with findings, not raw dumps.
+- Every `[+]`, `[-]`, `[!]` claim must cite evidence.
+- Mark small samples as `低樣本` / `low confidence` instead of overstating them.
 
-## 1. SINGLE — Single Trade Review
-
-```markdown
-## Trade Review — {instId} [{LIVE|DEMO}]
-**{openTime}** → **{closeTime}** ({duration})
-
-| | |
-|---|---|
-| Direction | **{LONG/SHORT}** |
-| Leverage | **{lever}x** |
-| Entry | **${openAvgPx}** |
-| Exit | **${closeAvgPx}** |
-| Size | {closeTotalPos} (peak: {openMaxPos}) |
-| Margin Mode | {mgnMode} |
-
-`── P&L Breakdown ──────────────────────────────────`
-
-| Component | Amount |
-|-----------|--------|
-| Price PnL | **{+/-}${pnl}** ({+/-}{pnlRatio}%) |
-| Trading Fees | -${fee} |
-| Funding Costs | {+/-}${fundingFee} |
-| Liq. Penalty | -${liqPenalty} |
-| **Net Realized** | **{+/-}${realizedPnl}** |
-
-`── Risk Metrics ───────────────────────────────────`
-
-- R-Multiple: **{R}R** {or N/A if no SL}
-- Initial Risk: ${risk} (SL @ ${slTriggerPx})
-- Reward:Risk: **{ratio} : 1**
-- Leverage Risk: {distance}% from liquidation
-
-`── Price Action ───────────────────────────────────`
-
-(Simple ASCII chart of price during position hold)
-
-    ${high} |          /\
-    ${mid}  |     /---/  \--- EXIT
-    ${low}  |/---/
-    ${sl}   |. . . . . SL . . . . .
-            +---------------------------
-             {date1}   {date2}   {date3}
-
-`── Execution ──────────────────────────────────────`
-
-- Entry fills: {n} ({maker%}% maker, {taker%}% taker)
-- Exit fills: {n} ({maker%}% maker, {taker%}% taker)
-- Entry slippage: {+/-}{bps} bps
-- Exit slippage: {+/-}{bps} bps
-- Close type: {Manual close | Partial liq | Full liq | ADL}
-
-`── Assessment ─────────────────────────────────────`
-
-[+] {strength_1}
-[+] {strength_2}
-[-] {weakness_1}
-[!] {warning_1}
-
-`── Next Steps ─────────────────────────────────────`
-
-→ "{suggestion_1}" ({target_mode})
-→ "{suggestion_2}" ({target_mode})
-→ "{suggestion_3}" ({target_mode})
-```
-
----
-
-## 2. PERIOD — Period Summary
+## 1. PERIOD — Standard Chat Review
 
 ```markdown
-## Period Summary — {startDate} to {endDate} [{LIVE|DEMO}]
+## 交易複盤 — {startDate} to {endDate} [{DEMO|LIVE}]
 
-**{n}** trades | Net PnL: **{+/-}${pnl}**
+### Executive Summary
+- 淨盈虧：**{+/-}$ {netPnl}**，共 **{n}** 筆，勝率 **{winRate}%**，Profit Factor **{pf}**
+- `[+]` {top_positive_finding_with_evidence}
+- `[-]` {top_negative_finding_with_evidence}
+- `[!]` {main_risk_or_cost_warning_with_evidence}
+- 下一個最值得追查的是：**{specific_follow_up_target}**
 
-| | Count | Amount |
-|---|---|---|
-| Winners | {w} ({w%}%) | +${win} |
-| Losers | {l} ({l%}%) | -${loss} |
-| Break-even | {b} ({b%}%) | — |
-
-`── Key Metrics ────────────────────────────────────`
-
+### Scorecard
 | Metric | Value |
 |--------|-------|
-| Profit Factor | **{pf}** |
-| Expectancy | **{+/-}${exp}** / trade |
-| Avg Winner | +${avgW} ({avgWR}R) |
-| Avg Loser | -${avgL} ({avgLR}R) |
-| Win/Loss Ratio | {ratio} : 1 |
-| Largest Win | +${lgW} ({instId}, {date}) |
-| Largest Loss | -${lgL} ({instId}, {date}) |
-| Max Consec Win/Loss | {w} / {l} |
+| Net PnL | {+/-}${netPnl} |
+| Trades | {n} |
+| Win Rate | {winRate}% |
+| Profit Factor | {pf} |
+| Expectancy | {+/-}${expectancy} / trade |
+| Max Drawdown | -${maxDd} |
+| Total Costs | ${totalCosts} |
 
-`── Daily P&L ──────────────────────────────────────`
+### What Drove PnL
+- `[+]` {best_instrument_or_direction}: {evidence}
+- `[+]` {best_behavior_pattern}: {evidence}
+- `[+]` {best_market_context_pattern}: {evidence}
 
-▅▃▁▆▇█▃ (+680 +340 -280 +520 +890 +950 +47)
+### What Hurt
+- `[-]` {largest_drag_1}: {evidence}
+- `[-]` {largest_drag_2}: {evidence}
+- `[!]` 成本拖累：${totalCosts}，約占 {costPct}% {cost_denominator}
 
-`── Equity Curve ───────────────────────────────────`
+### Market Context
+- 已做 market-context enrich：**{enrichedTrades}/{totalTrades}** 筆
+- {tradeA}: `{regimeTag}` / `{trendAlignment}` / `{entryTimingTag}`，MAE {maePct}% ，MFE {mfePct}% ，Capture {capturePct}%
+- {tradeB}: `{regimeTag}` / `{trendAlignment}` / `{entryTimingTag}`，MAE {maePct}% ，MFE {mfePct}% ，Capture {capturePct}%
+- {market_context_conclusion_with_evidence}
 
-    +${max} |                         /\
-    +${mid} |               /--------/  \--
-    +${low} |     /--------/
-        $0  |/---/
-            +--------------------------------------
-             {date labels across period}
+### Behavior Patterns
+- 方向：Long **{longCount}** 筆 {+/-}${longPnl} vs Short **{shortCount}** 筆 {+/-}${shortPnl}
+- 槓桿：{best_leverage_bucket_or_low_sample_note}
+- 持倉時長：{best_hold_bucket_or_low_sample_note}
+- 交易時段：{best_session_or_low_sample_note}
 
-`── By Instrument ──────────────────────────────────`
+### Action Adjustments
+- `[+]` 保留：{do_more_of_this}
+- `[-]` 減少：{do_less_of_this}
+- `[!]` 調整：{specific_process_change}
 
-| Instrument | Trades | Net PnL | Win Rate |
-|------------|--------|---------|----------|
-| BTC-USDT-SWAP | 8 | **+$1,520** | 75.0% |
-| ETH-USDT-SWAP | 9 | **+$1,180** | 66.7% |
-| SOL-USDT-SWAP | 6 | **+$147** | 33.3% |
-
-`── By Direction ───────────────────────────────────`
-
-- **Long**: {n} trades, {w%}% win, {+/-}${pnl} █████████████
-- **Short**: {n} trades, {w%}% win, {+/-}${pnl} ████████
-
-`── Costs ──────────────────────────────────────────`
-
-- Trading Fees: **${fees}**
-- Funding Costs: **${funding}**
-- Total Costs: **${total}** ({pct}% of gross win)
-
-`── Next Steps ─────────────────────────────────────`
-
-→ "查看最差那筆交易的詳情" (SINGLE)
-→ "檢查風險指標" (RISK)
-→ "分析交易模式" (PATTERN)
+### Next Steps
+- `查看最大虧損那筆交易`
+- `檢查風險指標`
+- `匯出 CSV`
 ```
 
----
-
-## 3. RISK — Risk Assessment
+## 2. PERIOD — Executive Summary Only
 
 ```markdown
-## Risk Assessment — {startDate} to {endDate} [{LIVE|DEMO}]
+## 交易複盤摘要 — {startDate} to {endDate} [{DEMO|LIVE}]
 
-`── Risk Scores ────────────────────────────────────`
-
-Overall Risk:     **{LEVEL}**  ▓▓▓░░░░░░░  **{n}/10**
-Leverage Risk:    **{LEVEL}**  ▓▓▓░░░░░░░  **{n}/10**
-Concentration:    **{LEVEL}**  ▓▓▓░░░░░░░  **{n}/10**
-Sizing Risk:      **{LEVEL}**  ▓▓▓░░░░░░░  **{n}/10**
-Drawdown Risk:    **{LEVEL}**  ▓▓▓░░░░░░░  **{n}/10**
-
-`── Leverage Profile ───────────────────────────────`
-
-- Avg Leverage: **{avg}x** | Max: **{max}x** ({instId}, {date})
-
-| Bucket | Trades | Distribution |
-|--------|--------|--------------|
-| 1-3x | {n} ({pct}%) | ████████████████ |
-| 3-5x | {n} ({pct}%) | ██████████ |
-| 5-10x | {n} ({pct}%) | ██████ |
-| 10-20x | {n} ({pct}%) | ███ |
-| 20x+ | {n} ({pct}%) | █ |
-
-`── Drawdown Analysis ──────────────────────────────`
-
-- Max Drawdown: **-${dd}** (-{pct}% of equity)
-- Drawdown Duration: {duration}
-- Recovery Time: {duration}
-- Sharpe Ratio: **{sharpe}**
-- Sortino Ratio: **{sortino}**
-
-`── Position Sizing ────────────────────────────────`
-
-- Avg position / equity: **{pct}%**
-- Max position / equity: **{pct}%** ({instId})
-- Recommended max: 10% per position
-
-`── Concentration ──────────────────────────────────`
-
-| Instrument | Exposure | |
-|------------|----------|-|
-| {inst1} | {pct}% | ████████████████████ |
-| {inst2} | {pct}% | ██████████ |
-| {inst3} | {pct}% | █████ |
-
-`── Liquidation Events ─────────────────────────────`
-
-- Full liquidations: **{n}**
-- Partial liquidations: **{n}**
-- ADL events: **{n}**
-
-`── Recommendations ────────────────────────────────`
-
-[!] {warning_1}
-[!] {warning_2}
-[+] {positive_1}
-
-`── Next Steps ─────────────────────────────────────`
-
-→ "{view cost breakdown}" (COST)
-→ "{check execution quality}" (EXECUTION)
+- 淨盈虧：**{+/-}${netPnl}**，共 **{n}** 筆，勝率 **{winRate}%**
+- `[+]` {best_finding_with_evidence}
+- `[-]` {worst_finding_with_evidence}
+- `[!]` {primary_warning_with_evidence}
+- 建議下一步：**{best_follow_up_mode_or_export}**
 ```
 
----
-
-## 4. EXECUTION — Execution Quality
+## 3. SINGLE — Detailed Trade Review
 
 ```markdown
-## Execution Quality — {startDate} to {endDate} [{LIVE|DEMO}]
+## 單筆交易複盤 — {instId} [{DEMO|LIVE}]
 
-`── Maker/Taker Breakdown ─────────────────────────`
-
-Total fills: **{n}**
-
-| Type | Fills | Volume % | |
-|------|-------|----------|-|
-| Maker | {n} | {pct}% | ████████████████████ |
-| Taker | {n} | {pct}% | █████████ |
-
-`── Fee Impact ─────────────────────────────────────`
-
-- Maker fees (rebate): **+${rebate}**
-- Taker fees (cost): **-${cost}**
-- Net fee impact: **-${net}**
-- Potential savings with 100% maker: **${savings}**
-
-`── Slippage Analysis ──────────────────────────────`
-
+### Snapshot
 | Metric | Value |
 |--------|-------|
-| Avg entry slippage | {+/-}{bps} bps |
-| Avg exit slippage | {+/-}{bps} bps |
-| Total slippage cost | ${cost} |
-| Worst slippage | {bps} bps ({instId}, {date}) |
+| Direction | {direction} |
+| Leverage | {leverage}x |
+| Entry | ${entryPrice} |
+| Exit | ${exitPrice} |
+| Net PnL | {+/-}${realizedPnl} |
+| Duration | {duration} |
 
-`── Order Type Usage ───────────────────────────────`
+### Trade Outcome
+- Price PnL：{+/-}${pnl}
+- Costs：${costs}
+- Close Type：{closeType}
 
-- Market: {n} ({pct}%) ██████████████
-- Limit: {n} ({pct}%) ████████████████████
-- Post-only: {n} ({pct}%) ██████
+### Market Context
+- Local regime：`{regimeTag}`
+- Alignment：`{trendAlignment}`
+- Entry timing：`{entryTimingTag}`
+- MAE：{maePct}% ，MFE：{mfePct}% ，Capture：{capturePct}%
 
-`── Recommendations ────────────────────────────────`
+### Assessment
+- `[+]` {strength_with_evidence}
+- `[-]` {weakness_with_evidence}
+- `[!]` {main_warning_with_evidence}
 
-[!] {suggestion about limit vs market orders}
-[+] {positive execution finding}
+### Next Steps
+- `檢查執行品質`
+- `比較同類型交易`
 ```
 
----
-
-## 5. COST — Cost Analysis
+## 4. RISK — Risk Review
 
 ```markdown
-## Cost Analysis — {startDate} to {endDate} [{LIVE|DEMO}]
+## 風險複盤 — {startDate} to {endDate} [{DEMO|LIVE}]
 
-`── Summary ────────────────────────────────────────`
-
+### Risk Snapshot
 | Metric | Value |
 |--------|-------|
-| Total Costs | **${total}** |
-| Costs / Volume | {bps} bps |
-| Costs / Net PnL | {pct}% |
+| Max Drawdown | -${maxDd} |
+| Avg Leverage | {avgLev}x |
+| Max Leverage | {maxLev}x |
+| Concentration | {topInstPct}% in {topInst} |
+| Liquidations | {liqCount} |
 
-`── Breakdown ──────────────────────────────────────`
+### Main Findings
+- `[!]` {largest_risk_problem_with_evidence}
+- `[-]` {second_risk_problem_with_evidence}
+- `[+]` {best_risk_discipline_finding_with_evidence}
 
-| Category | Amount | Share | |
-|----------|--------|-------|-|
-| Trading Fees | ${fees} | {pct}% | ████████████ |
-| Funding Costs | ${fund} | {pct}% | ██████ |
-| Liq. Penalties | ${liq} | {pct}% | ██ |
+### Risk Buckets
+- 槓桿：{bucket_summary}
+- 倉位集中：{concentration_summary}
+- 回撤：{drawdown_summary}
 
-`── Trading Fee Detail ─────────────────────────────`
-
-- Maker rebates: **+${rebate}**
-- Taker fees: **-${taker}**
-- Net trading fee: **-${net}**
-
-`── Funding Rate Impact ────────────────────────────`
-
-- Funding paid: -${paid}
-- Funding received: +${received}
-- Net funding: **{+/-}${net}**
-- Avg daily cost: **${daily}**
-
-`── By Instrument ──────────────────────────────────`
-
-| Instrument | Cost | |
-|------------|------|-|
-| {inst1} | ${cost} | ██████████████████████ |
-| {inst2} | ${cost} | ████████████ |
-| {inst3} | ${cost} | █████ |
-
-`── Optimization Tips ──────────────────────────────`
-
-[!] {fee tier suggestion}
-[!] {funding rate strategy tip}
+### Next Steps
+- `查看成本拖累`
+- `詳細看最大回撤區間`
 ```
 
----
-
-## 6. PATTERN — Pattern Recognition
+## 5. EXECUTION — Execution Review
 
 ```markdown
-## Pattern Analysis — {startDate} to {endDate} [{LIVE|DEMO}]
+## 執行品質複盤 — {startDate} to {endDate}
 
-`── By Instrument ──────────────────────────────────`
+### Snapshot
+| Metric | Value |
+|--------|-------|
+| Total fills | {fillCount} |
+| Maker share | {makerPct}% |
+| Taker share | {takerPct}% |
+| Avg slippage | {avgSlipBps} bps |
+| Fee drag | ${feeDrag} |
 
-| Instrument | Trades | Net PnL | Win Rate | PF |
-|------------|--------|---------|----------|-----|
-| BTC-USDT-SWAP | 8 | **+$1,520** | 75.0% | 3.21 |
-| ETH-USDT-SWAP | 9 | **+$1,180** | 66.7% | 2.45 |
-| SOL-USDT-SWAP | 6 | **+$147** | 33.3% | 1.12 |
+### Findings
+- `[+]` {best_execution_finding_with_evidence}
+- `[-]` {worst_execution_finding_with_evidence}
+- `[!]` {main_slippage_or_order_quality_warning}
 
-`── By Direction ───────────────────────────────────`
-
-- **Long**: {n} trades, {w%}% win, **{+/-}${pnl}** ████████████████
-- **Short**: {n} trades, {w%}% win, **{+/-}${pnl}** ████████
-
-`── By Leverage ────────────────────────────────────`
-
-| Bucket | Trades | Win Rate | PF | |
-|--------|--------|----------|----|-|
-| 1-5x | {n} | {w%}% | {pf} | ████████████████ |
-| 5-10x | {n} | {w%}% | {pf} | ██████████ |
-| 10-20x | {n} | {w%}% | {pf} | ████ |
-
-`── By Hold Duration ───────────────────────────────`
-
-| Duration | Trades | Win Rate | Avg PnL |
-|----------|--------|----------|---------|
-| <1h | {n} | {w%}% | {+/-}${avg} |
-| 1-4h | {n} | {w%}% | {+/-}${avg} |
-| 4-12h | {n} | {w%}% | {+/-}${avg} |
-| 12-24h | {n} | {w%}% | {+/-}${avg} |
-| 1-3d | {n} | {w%}% | {+/-}${avg} |
-| >3d | {n} | {w%}% | {+/-}${avg} |
-
-`── By Session (UTC) ───────────────────────────────`
-
-- Asian (00-08): {n} trades, {w%}% win ████████
-- European (08-16): {n} trades, {w%}% win ████████████████
-- US (16-00): {n} trades, {w%}% win ██████████████
-
-`── Key Findings ───────────────────────────────────`
-
-1. {finding with strongest signal}
-2. {second finding}
-3. {third finding}
-
-`── Actionable Insights ────────────────────────────`
-
-[+] {what to do more of}
-[-] {what to do less of}
-[!] {what to change}
+### Next Steps
+- `比對單筆交易的進出場`
+- `查看費用分析`
 ```
 
----
+## 6. COST — Cost Review
 
-## 7. JOURNAL — Export Format
+```markdown
+## 成本複盤 — {startDate} to {endDate}
 
-### Table format (default)
+### Cost Snapshot
+| Metric | Value |
+|--------|-------|
+| Trading Fees | ${fees} |
+| Funding | ${funding} |
+| Liq. Penalties | ${liqPenalty} |
+| Total Costs | ${totalCosts} |
+| Cost / Gross Win | {costPct}% |
 
-Use a markdown table:
+### Findings
+- `[-]` {largest_cost_drag_with_evidence}
+- `[-]` {second_cost_drag_with_evidence}
+- `[+]` {best_cost_discipline_finding}
 
-| Date | Instrument | Dir | Lever | Entry | Exit | Net PnL | PnL% | Dur |
-|------|-----------|-----|-------|-------|------|---------|------|-----|
-| Mar 01 | BTC-USDT-SWAP | LONG | 10x | $84,250 | $86,120 | **+$888.25** | +20.63% | 43h |
-| Mar 02 | ETH-USDT-SWAP | SHORT | 5x | $3,850 | $3,920 | **-$480.00** | -6.24% | 8h |
-| Mar 03 | SOL-USDT-SWAP | LONG | 3x | $142.30 | $148.90 | **+$660.00** | +13.89% | 26h |
-| **TOTAL** | **{n} trades** | | **avg {x}x** | | | **+$2,847** | | |
-
-### CSV format
-
-```csv
-date,instrument,direction,leverage,entry_price,exit_price,net_pnl,pnl_pct,duration_hours,fees,funding_fee,close_type
-2026-03-01,BTC-USDT-SWAP,long,10,84250.00,86120.00,888.25,20.63,42.75,-34.45,-12.30,manual
+### Next Steps
+- `查看交易模式`
+- `匯出 CSV`
 ```
 
-### JSON format
+## 7. PATTERN — Pattern Review
 
-```json
-{
-  "period": { "start": "2026-03-01", "end": "2026-03-07" },
-  "account": "demo",
-  "trades": [
-    {
-      "posId": "12345",
-      "instId": "BTC-USDT-SWAP",
-      "direction": "long",
-      "leverage": 10,
-      "openAvgPx": 84250.00,
-      "closeAvgPx": 86120.00,
-      "realizedPnl": 888.25,
-      "pnlRatio": 0.2063,
-      "fee": -34.45,
-      "fundingFee": -12.30,
-      "durationHours": 42.75,
-      "closeType": "manual",
-      "openTime": "2026-03-01T14:30:00Z",
-      "closeTime": "2026-03-03T09:15:00Z"
-    }
-  ],
-  "summary": { ... }
-}
+```markdown
+## 交易模式複盤 — {startDate} to {endDate}
+
+### High-Signal Patterns
+- `[+]` {best_pattern_with_evidence}
+- `[-]` {worst_pattern_with_evidence}
+- `[!]` {low_confidence_or_concentration_warning}
+
+### Buckets
+- Instrument：{instrument_summary}
+- Direction：{direction_summary}
+- Hold Duration：{duration_summary}
+- Session：{session_summary}
+
+### Next Steps
+- `查看對應的代表性交易`
+- `匯出完整報告`
 ```
 
----
+## 8. JOURNAL — Artifact Response
 
-## 8. Shared Components
+```markdown
+## 已生成交易複盤工件
+
+- Markdown：`{markdownPath}`
+- CSV：`{csvPath}`
+- SVG：`{svgPath_or_not_requested}`
+
+### Included
+- 摘要與詳報
+- 選中交易深挖
+- Enriched trade ledger
+
+### If file generation is unavailable
+- 直接在聊天內返回 markdown 內容
+- 將 CSV 內容放入 ```csv fenced block
+```
+
+## 9. Markdown Artifact Template
+
+Use this for exported `.md` reports. It can be longer than the chat version.
+
+```markdown
+# OKX Trade Review — {startDate} to {endDate} [{DEMO|LIVE}]
+
+## Executive Summary
+- {summary_bullets}
+
+## Scorecard
+| Metric | Value |
+|--------|-------|
+| Net PnL | {netPnl} |
+| Win Rate | {winRate}% |
+| Profit Factor | {pf} |
+| Expectancy | {expectancy} |
+| Max Drawdown | {maxDd} |
+| Total Costs | {totalCosts} |
+
+## What Drove PnL
+- {drivers}
+
+## What Hurt
+- {hurts}
+
+## Market Context
+- {context_summary}
+
+## Behavior Patterns
+- {pattern_summary}
+
+## Action Adjustments
+- {actions}
+
+## Selected Trade Deep Dives
+### {instId} — {openTime}
+- Regime: `{regimeTag}`
+- Alignment: `{trendAlignment}`
+- Entry timing: `{entryTimingTag}`
+- MAE/MFE/Capture: {maePct}% / {mfePct}% / {capturePct}%
+- Review: {trade_commentary}
+
+## Appendix — Enriched Ledger
+| Close Time | Instrument | Dir | Net PnL | Costs | Tags |
+|------------|------------|-----|---------|-------|------|
+| {closeTime} | {instId} | {direction} | {realizedPnl} | {costs} | {tags} |
+```
+
+## 10. Shared Components
 
 ### Sparkline
-Use Unicode block elements for inline mini-charts:
-```
-▁▂▃▄▅▆▇█
-```
-Map values to 8 levels proportionally. Example:
-```
-Daily P&L: ▅▃▁▆▇█▃  (+680 +340 -280 +520 +890 +950 +47)
+
+Use `▁▂▃▄▅▆▇█` for daily PnL, equity, or capture trends.
+
+Example:
+
+```text
+Daily PnL: ▁▃▂▅█▄▆
 ```
 
-### Horizontal Bar Chart
-Scale bars proportionally to the maximum value:
+### 10-Character Bar
+
+Use a fixed-width 10-character bar for comparisons.
+
+Example:
+
+```text
+BTC   +$1,520  ████████░░
+ETH   +$620    ████░░░░░░
+SOL   -$240    ██░░░░░░░░
 ```
-BTC  +$1,520  ██████████████████████  75% win
-ETH  +$1,180  █████████████████       67% win
-SOL    +$147  ██                      33% win
-```
-Use `█` for positive, `▓` for negative.
 
-### Risk Score Bar
-```
-{LABEL}  {LEVEL}  {▓▓▓▓▓░░░░░}  {n}/10
-```
-Level thresholds: 1-3 = LOW, 4-6 = MODERATE, 7-8 = HIGH, 9-10 = CRITICAL
+### Small Tables Only
 
-### Formatting Notes
-
-Claude Code renders markdown in the terminal. These render well:
-- **Bold** for key numbers and headers
-- Markdown tables (pipe `|` format)
-- Backtick-wrapped section dividers
-- Inline Unicode blocks (█▓░▁▂▃▄▅▆▇)
-- Lists with `-` or numbered
-
-These have known issues and should be avoided:
-- ANSI color escape codes (get mangled by line-wrapping)
-- Complex box-drawing borders (┌─┐│└─┘) around entire output blocks
-- Nested box-drawing tables inside box-drawing borders
-
-### Number Formatting
-- USD amounts: `$1,234.56` with commas, 2 decimal places
-- Percentages: `12.3%` with 1 decimal place
-- R-multiples: `+2.37R` with 2 decimal places
-- Leverage: `10x`
-- Duration: `42.75h` or `1d 18h 45m` for longer durations
-- Large numbers: `$1.23M`, `$456K` for readability
+Use 2-column or 3-column tables in chat. Move wide ledgers to the exported
+markdown or CSV.

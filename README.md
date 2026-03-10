@@ -1,56 +1,134 @@
 # OKX Trade Review Skill for Claude Code
 
-> Structured post-mortem analysis (交易複盤) of OKX trading history — powered by MCP
+Markdown-first OKX trade review for Claude Code, backed by `okx-trade-mcp`.
 
-This [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin adds trade review capabilities via the [`okx-trade-mcp`](https://www.npmjs.com/package/okx-trade-mcp) data layer. It analyzes your closed positions, computes performance metrics, identifies trading patterns, and gives you actionable improvement suggestions — all inside your terminal.
+This plugin is designed for exchange trade post-mortems in terminal-first or
+browserless environments. It fetches closed trade history, enriches selected
+trades with time-aligned market candles, explains what actually drove PnL, and
+can export artifacts for later analysis.
 
-## What It Does
+## What Changed in v2
 
-| Mode | What you get |
-|------|-------------|
-| **Period Summary** | Win rate, profit factor, expectancy, equity curve, instrument breakdown |
-| **Single Trade** | Full P&L breakdown, execution details, risk metrics, price chart, assessment |
-| **Risk Assessment** | Leverage distribution, max drawdown, concentration scoring (1-10), Sharpe/Sortino |
-| **Execution Quality** | Maker/taker ratio, slippage analysis, fee impact |
-| **Cost Analysis** | Fees, funding rates, liquidation penalties, optimization tips |
-| **Pattern Recognition** | Performance by instrument, direction, leverage, hold duration, trading session |
-| **Trade Journal** | Export as markdown table, CSV, or JSON |
+- Markdown-first reporting for narrow chat windows
+- Deeper `複盤我的交易` workflow with market-context enrichment
+- Optional artifact export:
+  - long-form markdown report
+  - enriched CSV
+  - optional SVG overview
+- Persistent contributor logs in `tasks/`
 
-### Example Output
+## Core Capabilities
 
+| Mode | Output |
+|------|--------|
+| `PERIOD` | Executive summary, scorecard, PnL drivers, drags, market context, behavior patterns, action adjustments |
+| `SINGLE` | One-trade deep dive with MAE/MFE, capture, regime, alignment, entry timing |
+| `RISK` | Drawdown, leverage, concentration, liquidation, position-sizing review |
+| `EXECUTION` | Maker/taker mix, slippage, fill quality, execution drag |
+| `COST` | Fees, funding, liquidation penalties, cost drag |
+| `PATTERN` | Instrument, direction, leverage, duration, and session patterns |
+| `JOURNAL` | Enriched CSV export and optional markdown/SVG artifacts |
+
+## Default Behavior
+
+When the user says:
+
+```text
+複盤我的交易
 ```
-## Period Summary — Mar 01 to Mar 07 [DEMO]
 
-23 trades | Net PnL: +$2,847.25
+the skill defaults to:
 
-| Metric          | Value                |
-|-----------------|----------------------|
-| Win Rate        | 61.5%                |
-| Profit Factor   | 2.25                 |
-| Expectancy      | +$123.79 / trade     |
-| Largest Win     | +$888.25 (BTC, Mar 01) |
-| Max Drawdown    | -$620.00 (-4.2%)     |
+- `demo` account
+- last 7 days
+- chat markdown only
+- `standard` depth
 
-── By Instrument ──────────────────────────────
-BTC-USDT-SWAP  8 trades  +$1,520  ██████████████████  75% win
-ETH-USDT-SWAP  9 trades  +$1,180  █████████████████   67% win
-SOL-USDT-SWAP  6 trades    +$147  ██                  33% win
+Depth policy:
 
-── Next Steps ─────────────────────────────────
-→ "查看最差那筆交易的詳情" (drill into worst trade)
-→ "檢查風險指標" (risk assessment)
-→ "分析交易模式" (find patterns)
+- `<= 20 trades`: enrich every trade with market context
+- `21-100 trades`: enrich top 10 impact trades and summarize the rest
+- `> 100 trades`: warn and fall back to aggregate review plus top 12 trades
+
+Supported modifiers:
+
+- `快速複盤`
+- `深度逐筆`
+- `完整報告`
+- `輸出 markdown 檔`
+- `匯出 CSV`
+- `附圖`
+- `只看摘要`
+
+## What the Review Looks Like
+
+The main chat response is structured as:
+
+1. `Executive Summary`
+2. `Scorecard`
+3. `What Drove PnL`
+4. `What Hurt`
+5. `Market Context`
+6. `Behavior Patterns`
+7. `Action Adjustments`
+8. `Next Steps`
+
+This replaces the older wide ASCII box layout. The goal is readability inside
+Claude Code, OpenClaw, and other narrow chat surfaces.
+
+## Market-Context Enrichment
+
+For selected trades, the skill uses `market_get_candles` to compute:
+
+- `preEntryMovePct`
+- `maePct`
+- `mfePct`
+- `capturePct`
+- `regimeTag`
+- `trendAlignment`
+- `entryTimingTag`
+
+These fields are used to distinguish:
+
+- good idea vs bad execution
+- aligned vs countertrend trades
+- chased entries vs pullback entries
+- exits that captured too little of the available move
+
+## Export Artifacts
+
+When scripting is available and the user asks for exports, the skill can
+generate:
+
+- `review-YYYYMMDD-YYYYMMDD.md`
+- `review-YYYYMMDD-YYYYMMDD.enriched.csv`
+- `review-YYYYMMDD-YYYYMMDD.svg`
+
+The exporter lives at:
+
+- [skills/okx-trade-review/scripts/trade_review_assets.py](./skills/okx-trade-review/scripts/trade_review_assets.py)
+
+It accepts normalized review JSON and writes artifacts without third-party
+Python dependencies.
+
+### Example exporter usage
+
+```bash
+python skills/okx-trade-review/scripts/trade_review_assets.py /tmp/okx-review.json --output-dir /tmp/review-out --svg
 ```
+
+If Python or file writing is unavailable, the skill should still return the full
+markdown review in chat and can fall back to inline fenced CSV/markdown content.
 
 ## Quick Start
 
 ### Prerequisites
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
 - Node.js 18+
-- OKX API key with **read-only** permissions
+- OKX API key with read-only permissions
 
-### 1. Install the MCP server (data layer)
+### 1. Install the MCP server
 
 ```bash
 npm install -g okx-trade-mcp
@@ -68,9 +146,7 @@ passphrase = "your-passphrase"
 EOF
 ```
 
-Get your API key at [OKX API Management](https://www.okx.com/account/my-api). Select **read-only** permissions — this skill never executes trades.
-
-### 3. Install this skill
+### 3. Install the plugin
 
 ```bash
 claude plugin add foxisyw/skills-reviewTrades
@@ -78,173 +154,94 @@ claude plugin add foxisyw/skills-reviewTrades
 
 ### 4. Use it
 
-Open Claude Code and just ask:
+Examples:
 
-```
+```text
 複盤我的交易
 ```
 
-or
-
-```
+```text
 review my trades this week
 ```
 
-The skill auto-detects trade review intent and handles MCP connectivity checks.
+```text
+複盤我的交易，匯出 CSV
+```
+
+```text
+深度逐筆複盤這個月的 BTC 和 ETH 交易
+```
 
 ## Trigger Phrases
 
-The skill activates on natural language — no slash command needed.
+English:
 
-| Language | Examples |
-|----------|---------|
-| English | "how did I do this week", "review my BTC trade", "show win rate", "risk assessment", "export trades" |
-| 中文 | "這週績效如何", "複盤那筆交易", "勝率多少", "風險評估", "匯出交易記錄" |
+- `review my trades`
+- `how did I do this week`
+- `review my BTC trade`
+- `risk assessment`
+- `export trades`
 
-**Full trigger list**: review, 複盤, post-mortem, performance, 績效, win rate, 勝率, P&L, 盈虧, drawdown, 回撤, slippage, 滑點, fees, 手續費, risk, 風險, export, 匯出, patterns, 交易模式, journal, 交易日誌
+中文:
+
+- `複盤我的交易`
+- `這週績效如何`
+- `複盤那筆交易`
+- `風險評估`
+- `匯出交易記錄`
 
 ## Safety
 
-- **Demo by default** — always uses simulated trading account unless you explicitly confirm live
-- **Read-only** — never executes trades, only reads historical data
-- **Clear labeling** — every output shows `[DEMO]` or `[LIVE]` header
-- **3-month limit** — warns when requesting data beyond OKX's retention period
+- Demo by default
+- Read-only review only
+- Clear `[DEMO]` / `[LIVE]` labeling
+- Warns when requests exceed OKX's approximate 3-month retention window
 
-## Architecture
+## Repository Structure
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Claude Code                                            │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  okx-trade-review (this plugin)                   │  │
-│  │  SKILL.md → intent detection → metric computation │  │
-│  │  → formatted output → next-step suggestions       │  │
-│  └──────────────────────┬────────────────────────────┘  │
-│                         │ MCP calls                     │
-│  ┌──────────────────────▼────────────────────────────┐  │
-│  │  okx-trade-mcp (installed separately)             │  │
-│  │  account positions, fills, orders, bills, candles │  │
-│  └──────────────────────┬────────────────────────────┘  │
-│                         │ REST API                      │
-└─────────────────────────┼───────────────────────────────┘
-                          ▼
-                    OKX Exchange API
-```
-
-## Plugin Structure
-
-```
+```text
 skills-reviewTrades/
 ├── .claude-plugin/
-│   └── plugin.json              # Claude Code plugin manifest
-├── .mcp.json                    # MCP server dependency declaration
+│   └── plugin.json
+├── .mcp.json
 ├── skills/
 │   └── okx-trade-review/
-│       ├── SKILL.md             # Main skill — intent routing + agent instructions
-│       └── references/
-│           ├── mcp-tools.md     # MCP tool parameter & return field reference
-│           ├── formulas.md      # Statistical formulas (Sharpe, drawdown, etc.)
-│           └── output-templates.md  # Output formatting templates
-├── CLAUDE.md                    # Project-level context
-├── package.json
-├── LICENSE                      # Apache-2.0
-└── README.md
+│       ├── SKILL.md
+│       ├── references/
+│       │   ├── formulas.md
+│       │   ├── market-context.md
+│       │   ├── mcp-tools.md
+│       │   └── output-templates.md
+│       └── scripts/
+│           └── trade_review_assets.py
+├── tasks/
+│   ├── dev-log.md
+│   ├── lessons.md
+│   └── todo.md
+├── CLAUDE.md
+├── LICENSE
+├── README.md
+└── package.json
 ```
 
-## Advanced Configuration
+## Development Logs
 
-### Live account
+This repo now keeps project-local implementation records:
 
-Add a second MCP server profile for real trading data:
+- [tasks/todo.md](./tasks/todo.md): active implementation checklist and review notes
+- [tasks/dev-log.md](./tasks/dev-log.md): append-only session log of repo changes
+- [tasks/lessons.md](./tasks/lessons.md): mistakes, bugs, and prevention rules
 
-```json
-{
-  "mcpServers": {
-    "okx-DEMO-simulated-trading": {
-      "command": "okx-trade-mcp",
-      "args": ["--profile", "demo", "--modules", "account,swap,market"]
-    },
-    "okx-LIVE-real-money": {
-      "command": "okx-trade-mcp",
-      "args": ["--profile", "live", "--modules", "account,swap,market"]
-    }
-  }
-}
-```
+These files are meant for contributors, not end users.
 
-Then tell Claude: "用真實帳戶查看" or "switch to live account".
+## Limitations
 
-### Spot trades
-
-The skill supports spot trade review via `spot_get_fills`. Just ask about spot trades specifically — the skill routes to the correct MCP tool.
-
-## Data Limitations
-
-- OKX API retains **3 months** of historical data
-- Pagination capped at **1,000 items** (10 pages × 100) per query
-- Spot trades use `spot_get_fills` (no position-level aggregation)
-- Funding rate data available only for perpetual swaps
+- OKX historical retention is limited
+- Pagination is capped in the skill flow
+- Spot review has different data availability from derivatives
+- The exporter expects normalized review JSON from the calling agent
+- Current verification is sample-based; there is no formal test suite yet
 
 ## License
 
-[Apache-2.0](LICENSE)
-
----
-
-# OKX 交易複盤技能
-
-> 在 Claude Code 終端中對 OKX 交易歷史進行結構化複盤分析
-
-## 功能
-
-| 模式 | 輸出內容 |
-|------|---------|
-| **期間績效** | 勝率、利潤因子、期望值、權益曲線、幣種分佈 |
-| **單筆複盤** | 完整盈虧拆解、執行細節、風險指標、價格圖、評估 |
-| **風險評估** | 槓桿分佈、最大回撤、集中度評分 (1-10)、Sharpe/Sortino |
-| **執行品質** | Maker/Taker 比例、滑點分析、手續費影響 |
-| **費用分析** | 手續費、資金費率、強平罰金、優化建議 |
-| **交易模式** | 按幣種、方向、槓桿、持倉時長、交易時段分析 |
-| **交易日誌** | 匯出為表格、CSV 或 JSON |
-
-## 快速開始
-
-### 1. 安裝 MCP 數據層
-
-```bash
-npm install -g okx-trade-mcp
-```
-
-### 2. 配置 API 密鑰
-
-```bash
-mkdir -p ~/.okx
-cat > ~/.okx/config.toml << 'EOF'
-[demo]
-api_key = "your-api-key"
-secret_key = "your-secret-key"
-passphrase = "your-passphrase"
-EOF
-```
-
-在 [OKX API 管理](https://www.okx.com/account/my-api) 申請 **唯讀** 權限的密鑰。
-
-### 3. 安裝技能
-
-```bash
-claude plugin add foxisyw/skills-reviewTrades
-```
-
-### 4. 使用
-
-```
-複盤我的交易
-```
-
-技能會自動偵測意圖並驗證 MCP 連接。
-
-## 安全性
-
-- **預設模擬帳戶** — 除非明確確認，否則只查看 demo 數據
-- **唯讀** — 永不執行交易
-- **清晰標示** — 所有輸出顯示 `[DEMO]` 或 `[LIVE]`
+[Apache-2.0](./LICENSE)

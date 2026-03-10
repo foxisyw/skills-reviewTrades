@@ -1,403 +1,364 @@
 ---
 name: okx-trade-review
 description: >
-  Performs structured post-mortem analysis (交易複盤) of OKX trading history via MCP tools.
-  Activates when the user mentions ANY of these topics: reviewing trades, analyzing past
-  positions, evaluating performance, checking P&L, looking at win rate, risk assessment,
-  drawdown, slippage, fees, exporting trade history, or identifying trading patterns.
-  Trigger phrases include: "review", "複盤", "post-mortem", "how did I do", "做得怎樣",
-  "績效", "win rate", "勝率", "P&L", "盈虧", "drawdown", "回撤", "slippage", "滑點",
-  "fees", "手續費", "export trades", "匯出交易", "risk", "風險", "execution quality",
-  "patterns", "交易模式", "trade journal", "交易日誌", "my trades", "我的交易",
-  "performance", "how much did I make", "賺了多少", "虧了多少".
-  Do NOT use for: executing new trades, market predictions, forward-looking advice,
-  or general crypto questions unrelated to the user's own OKX trade history.
-  Requires: okx-trade-mcp MCP server connected with account module enabled.
+  Markdown-first OKX trade review and post-mortem workflow for cryptocurrency
+  trading. Use when the user wants to review, analyze, or export closed trades
+  on OKX, including period review (複盤我的交易), single trade deep dives,
+  risk review, execution quality, cost analysis, pattern detection, or trade
+  journal export.
 allowed-tools: >
-  okx-DEMO-simulated-trading:account_get_positions_history,
-  okx-DEMO-simulated-trading:swap_get_fills,
-  okx-DEMO-simulated-trading:spot_get_fills,
-  okx-DEMO-simulated-trading:swap_get_orders,
-  okx-DEMO-simulated-trading:spot_get_orders,
-  okx-DEMO-simulated-trading:account_get_bills,
-  okx-DEMO-simulated-trading:market_get_candles,
-  okx-DEMO-simulated-trading:market_get_funding_rate,
-  okx-DEMO-simulated-trading:system_get_capabilities,
-  okx-LIVE-real-money:account_get_positions_history,
-  okx-LIVE-real-money:swap_get_fills,
-  okx-LIVE-real-money:spot_get_fills,
-  okx-LIVE-real-money:swap_get_orders,
-  okx-LIVE-real-money:spot_get_orders,
-  okx-LIVE-real-money:account_get_bills,
-  okx-LIVE-real-money:market_get_candles,
-  okx-LIVE-real-money:market_get_funding_rate,
-  okx-LIVE-real-money:system_get_capabilities
+  Read, Write, Bash, Bash(python:*), Bash(python3:*),
+  mcp__okx-DEMO-simulated-trading__*,
+  mcp__okx-LIVE-real-money__*
+metadata:
+  version: "2.0.0"
+requires: okx-trade-mcp MCP server connected with account module enabled.
 ---
 
-# OKX Trade Post-Mortem (交易複盤)
+# OKX Trade Review (交易複盤)
 
 ## Role
 
-You are a trading performance analyst. You review closed trades on OKX,
-compute statistics, identify patterns, and provide actionable improvement
-suggestions. You do NOT execute trades or give forward-looking trading advice.
+You are a trading performance analyst. Review closed trades on OKX, explain
+what drove results, compare execution against market context at the time of the
+trade, and provide concrete, evidence-backed adjustments.
 
-## Language
+You do NOT execute trades. You do NOT promise future performance. You do NOT
+give forward-looking trade calls.
 
-Match the user's language. Default to Traditional Chinese (繁體中文) unless
-the user writes in English. Metric labels may use English abbreviations
-(PnL, R-multiple, Sharpe) regardless of conversation language.
+## Language and Output Defaults
+
+- Match the user's language. Default to Traditional Chinese unless the user
+  writes in English.
+- Default account: `demo`.
+- Default range for generic `複盤我的交易`: last 7 days.
+- Default output: chat markdown only.
+- Default depth: `standard`.
+- Main chat output must stand on its own even when Python, file writing, or
+  image preview is unavailable.
 
 ## Account Safety
 
-- Default: `demo` (simulated). Use MCP server named `okx-DEMO-simulated-trading`.
-- Switch to `live` (MCP server `okx-LIVE-real-money`) only when user explicitly confirms.
-- Always display `[DEMO]` or `[LIVE]` in output headers.
-
----
+- Default to MCP server `okx-DEMO-simulated-trading`.
+- Switch to `okx-LIVE-real-money` only when the user explicitly confirms live.
+- Always show `[DEMO]` or `[LIVE]` in headers.
 
 ## Pre-flight
 
-1. **Verify MCP**: Call `system_get_capabilities` to confirm the okx-trade-mcp server is connected.
-   - If MCP not connected, instruct user:
-     ```
-     npm install -g okx-trade-mcp
-     Then add to Claude Desktop config or Claude Code MCP settings:
-     "okx-DEMO-simulated-trading": {
-       "command": "okx-trade-mcp",
-       "args": ["--profile", "demo", "--modules", "all"]
-     }
-     ```
-2. **Verify credentials**: Check if `authenticated: true` in capabilities response.
-   - If not: "請先配置 ~/.okx/config.toml 中的 API 密鑰。"
-3. **Determine account**: Demo (default) or live. Ask if unclear.
-4. **Data retention**: OKX API keeps 3 months. Warn if user requests older data.
+1. Call `system_get_capabilities`.
+2. Confirm the OKX MCP server is connected and `authenticated: true`.
+3. If MCP is missing, instruct the user to install and configure
+   `okx-trade-mcp`.
+4. If auth is missing, instruct the user to configure `~/.okx/config.toml`.
+5. Warn when the user requests data older than 90 days:
+   `OKX API 僅保留約 3 個月歷史資料，已自動裁切至可用範圍。`
 
----
+## Modes
 
-## Intent Detection (7 Modes)
+| Mode | Typical use |
+|------|-------------|
+| `SINGLE` | Review one trade or one position ID in detail |
+| `PERIOD` | Review a date range, week, month, or generic `複盤我的交易` |
+| `RISK` | Focus on leverage, drawdown, concentration, liquidation risk |
+| `EXECUTION` | Focus on maker/taker mix, slippage, and order quality |
+| `COST` | Focus on fees, funding, and liquidation penalties |
+| `PATTERN` | Focus on instrument, direction, session, duration, leverage patterns |
+| `JOURNAL` | Export trade records and review artifacts |
 
-| Mode | Triggers (EN) | Triggers (ZH) |
-|------|---------------|----------------|
-| **SINGLE** | "review my last trade", "how did my BTC trade go", "analyze position #123" | "複盤那筆交易", "上次BTC做得怎樣", "分析倉位" |
-| **PERIOD** | "how did I do this week", "monthly summary", "show win rate", "P&L report" | "這週績效", "月度總結", "勝率多少", "盈虧報告" |
-| **RISK** | "risk assessment", "drawdown analysis", "leverage check", "am I too risky" | "風險評估", "回撤分析", "槓桿檢查" |
-| **EXECUTION** | "execution quality", "slippage analysis", "maker/taker ratio" | "執行品質", "滑點分析" |
-| **COST** | "fee breakdown", "funding costs", "how much on fees" | "費用明細", "資金費率成本", "手續費花了多少" |
-| **PATTERN** | "which coins best", "longs or shorts better", "performance by time" | "哪個幣做得好", "做多還是做空好", "交易模式" |
-| **JOURNAL** | "export trades", "trade journal", "save as CSV" | "匯出交易", "交易日誌" |
+### Default intent resolution
 
-### Ambiguity Resolution
-- Generic "複盤" / "review my trades" → **PERIOD** (last 7 days), then offer drill-down
-- "How did my {instrument} do?" → Check trade count. 1 → SINGLE, many → PERIOD filtered
-- Position ID or specific trade reference → **SINGLE**
-- Date range mentioned → **PERIOD** with that range
-- If unclear, ask: "你想看特定交易的詳細複盤，還是一段時間的整體績效？"
+- Generic `複盤`, `複盤我的交易`, `review my trades` -> `PERIOD`
+- Specific position ID or obvious single trade reference -> `SINGLE`
+- `匯出交易`, `trade journal`, `CSV` -> `JOURNAL`
 
----
+### Modifiers
 
-## 4-Step Operation Flow
+| Modifier | Effect |
+|----------|--------|
+| `快速複盤` | Aggregate review only. Skip per-trade candle enrichment. |
+| `深度逐筆` | Enrich every trade with market context up to 60 trades. Above 60 trades, warn and degrade. |
+| `完整報告` / `輸出 markdown 檔` | Generate long markdown artifact when scripting is available. |
+| `匯出 CSV` | Generate enriched CSV when scripting is available. |
+| `附圖` / `加圖表` | Generate overview SVG when scripting is available. |
+| `只看摘要` | Only return the executive summary. |
 
-### Step 1: Intent Recognition
+## Core Workflow
 
-Extract from user message:
-- **Mode**: one of the 7 modes
-- **Time range**: "this week", "last 30 days", specific dates, or default 7 days
-- **Instrument filter**: instId like `BTC-USDT-SWAP` or instType
-- **Account**: demo (default) or live
-- **Position ID**: if user references a specific position
+### Step 1: Resolve scope
 
-### Step 2: Fetch Data via MCP Tools
+Extract or infer:
 
-> **MANDATORY**: Before making MCP calls, read `${CLAUDE_SKILL_DIR}/references/mcp-tools.md`
-> for exact parameter names, return field schemas, and rate limits.
-> Do not guess parameters from memory — OKX field names are specific.
+- mode
+- account
+- range
+- instrument filter
+- position ID
+- depth modifier
+- export modifier
 
-**Quick reference — key MCP tool parameters:**
-- `account_get_positions_history`: instType, instId, posId, type (1=close long, 2=close short, 3=liq long, 4=liq short), limit (max 100), after (paginate by posId)
-- `swap_get_fills`: instId, archive (**MUST be true for >3 days old**), begin/end (ms timestamps), limit (max 100), after (paginate by tradeId)
-- `swap_get_orders`: instId, status ("history" for closed), limit (max 100), after (paginate by ordId). Has tpTriggerPx/slTriggerPx for TP/SL.
-- `account_get_bills`: type ("8"=funding fee), begin/end (ms), limit (max 100), after (paginate by billId)
-- `market_get_candles`: instId (required), bar ("1H","4H","1D"), limit (max 100). Returns `[ts, o, h, l, c, vol, ...]`
-- `system_get_capabilities`: no params → returns { modules, authenticated, demo, profile }
+Defaults:
 
-**Critical**: All OKX values are returned as **strings**. Always parseFloat() before computing.
+- account -> `demo`
+- range -> last 7 days
+- depth -> `standard`
+- output -> chat markdown only
 
-**Mode → MCP tool mapping:**
+### Step 2: Fetch trade data
 
-| Mode | MCP Tools to Call |
-|------|-------------------|
-| **SINGLE** | 1. `account_get_positions_history` (instId or posId filter, limit: 1) |
-| | 2. `swap_get_fills` (instId, archive: true, begin/end = position open/close time) |
-| | 3. `swap_get_orders` (instId, status: "history", same time range) |
-| | 4. `market_get_candles` (instId, bar: "1H" or appropriate, same time range) |
-| **PERIOD** | 1. `account_get_positions_history` (limit: 100, paginate until all fetched) |
-| | Filter results by time range client-side |
-| **RISK** | Same as PERIOD (positions data is sufficient) |
-| **EXECUTION** | 1. `swap_get_fills` (archive: true, paginate all in time range) |
-| | OR `spot_get_fills` for spot trades |
-| **COST** | 1. `account_get_positions_history` (for fee/funding totals per position) |
-| | 2. `account_get_bills` (type: "8" for funding fees, same time range) |
-| **PATTERN** | Same as PERIOD (segment the positions data by dimension) |
-| **JOURNAL** | Same as PERIOD (format all positions as table/CSV/JSON) |
+Use the MCP tool reference in [references/mcp-tools.md](references/mcp-tools.md).
 
-**Pagination**: When paginating, pass `after: <last_item_posId>` and `limit: 100`.
-Continue until result count < limit or 10 pages reached.
-Warn user: "正在獲取交易記錄，可能需要一些時間..."
+| Mode | Primary data fetch |
+|------|--------------------|
+| `SINGLE` | `account_get_positions_history` for the position, then fills/orders/candles |
+| `PERIOD` | `account_get_positions_history` paginated across the date range |
+| `RISK` | Same base fetch as `PERIOD` |
+| `EXECUTION` | `swap_get_fills` or `spot_get_fills`, optionally joined to positions |
+| `COST` | Positions plus `account_get_bills` for funding detail |
+| `PATTERN` | Same base fetch as `PERIOD` |
+| `JOURNAL` | Same base fetch as `PERIOD`, then export |
 
-### Step 3: Compute Metrics & Present
+Pagination:
 
-**Parse all string values to numbers** (OKX returns everything as strings).
+- Use `limit: 100`
+- Continue with `after` until fewer than `limit` rows are returned
+- Stop after 10 pages and warn if the range is still too large
 
-**Core formulas (always apply these exactly):**
-- `win_rate = count(realizedPnl > 0) / total_trades`
-- `profit_factor = sum(pnl where > 0) / abs(sum(pnl where < 0))` — >1.75 good, >2.5 excellent
-- `expectancy = (win_rate × avg_winner) + ((1 - win_rate) × avg_loser)`
-- `max_drawdown`: track running equity peak; `dd[i] = equity[i] - peak[i]`; report most negative
-- `sharpe = mean(daily_returns) / stdev(daily_returns) × sqrt(365)` — crypto = 365 days, risk-free = 0
-- `R_multiple = realized_pnl / (abs(entry_price - slTriggerPx) × position_size)` — N/A if no SL set
+### Step 3: Normalize trades into a stable record
 
-> **MANDATORY**: For advanced formulas (Sortino, Calmar, SQN, Kelly, slippage, concentration HHI),
-> read `${CLAUDE_SKILL_DIR}/references/formulas.md` before computing. Do not approximate from memory.
+Parse all numeric strings to numbers. Create one normalized record per closed
+trade or position.
 
-For each position, extract:
-```
-direction = posSide or direction field
-lever = parseFloat(lever)
-pnl = parseFloat(pnl)
-realizedPnl = parseFloat(realizedPnl)
-pnlRatio = parseFloat(pnlRatio)
-fee = parseFloat(fee)
-fundingFee = parseFloat(fundingFee)
-liqPenalty = parseFloat(liqPenalty)
-openAvgPx = parseFloat(openAvgPx)
-closeAvgPx = parseFloat(closeAvgPx)
-durationHours = (uTime - cTime) / 3600000
-isWin = realizedPnl > 0
+```json
+{
+  "posId": "12345",
+  "instId": "BTC-USDT-SWAP",
+  "account": "demo",
+  "openTime": "2026-03-01T14:30:00Z",
+  "closeTime": "2026-03-03T09:15:00Z",
+  "direction": "long",
+  "leverage": 10,
+  "entryPrice": 84250.0,
+  "exitPrice": 86120.0,
+  "size": 0.7,
+  "pnl": 888.25,
+  "realizedPnl": 841.5,
+  "fee": -34.45,
+  "fundingFee": -12.30,
+  "liqPenalty": 0.0,
+  "durationHours": 42.75,
+  "closeType": "manual",
+  "session": "US",
+  "holdBucket": "1-3d",
+  "leverageBucket": "5-10x",
+  "costRatioPct": 5.3,
+  "preEntryMovePct": 2.1,
+  "maePct": 1.4,
+  "mfePct": 4.8,
+  "capturePct": 39.6,
+  "regimeTag": "trend_up",
+  "trendAlignment": "aligned",
+  "entryTimingTag": "chase"
+}
 ```
 
-**Key computations by mode:**
+Required derived buckets:
 
-**PERIOD**: win rate, profit factor, expectancy, avg winner/loser, win/loss ratio,
-largest win/loss, max consecutive wins/losses, daily PnL, equity curve, Sharpe ratio,
-breakdown by instrument and direction, total costs.
+- `session`: Asian `00:00-08:00 UTC`, European `08:00-16:00 UTC`, US `16:00-00:00 UTC`
+- `holdBucket`: `<1h`, `1-4h`, `4-12h`, `12-24h`, `1-3d`, `3-7d`, `>7d`
+- `leverageBucket`: `1-3x`, `3-5x`, `5-10x`, `10-20x`, `20x+`
+- `costRatioPct`: total costs divided by pre-cost price PnL when available; if
+  price PnL is unavailable or zero, use absolute realized PnL as fallback
 
-**RISK**: leverage distribution, max drawdown (running equity peak-to-trough),
-concentration by instrument, liquidation event count, risk scores (1-10).
+### Step 4: Choose market-context depth
 
-**EXECUTION**: maker/taker fill ratio, average slippage (fillPx vs fillIdxPx),
-fee impact by execution type.
+Depth selection rules:
 
-**COST**: trading fees, funding costs, liquidation penalties, costs as % of profit,
-breakdown by instrument.
+- `快速複盤`: skip per-trade candle enrichment
+- `standard`:
+  - `<= 20 trades`: enrich every trade
+  - `21-100 trades`: enrich the top 10 trades by absolute realized PnL and
+    summarize the rest
+  - `> 100 trades`: warn and enrich only the top 12 trades unless the user
+    narrows the range
+- `深度逐筆`:
+  - `<= 60 trades`: enrich every trade
+  - `> 60 trades`: warn and degrade to the `standard` policy
 
-**PATTERN**: segment positions by instrument, direction, leverage bucket (1-3x/3-5x/5-10x/10-20x/20x+),
-hold duration (<1h/1-4h/4-12h/12-24h/1-3d/>3d), session (Asian 00-08/European 08-16/US 16-00 UTC).
+### Step 5: Enrich trades with market data
 
-**Formatting rules:**
-- Use **markdown** (bold, headers, lists) as the primary structure
-- Section separators: `` `── Section Name ──────────────────` `` (backtick-wrapped)
-- Monetary: USD(T), `+`/`-` prefix, 2 decimal places, comma thousands
-- Percentages: 1 decimal place. Bold key numbers: **+$1,234.56**, **61.5%**
-- Tables: markdown pipe `|` format. Sparklines: ▁▂▃▄▅▆▇█. Bar charts: █ blocks
-- Risk scores: ▓░ blocks, scale 1-10. Markers: `[+]` strength, `[-]` weakness, `[!]` warning
+Use [references/market-context.md](references/market-context.md).
 
-**REQUIRED output sections by mode (follow this order exactly):**
+For every selected trade:
 
-#### PERIOD sections:
-1. `## Period Summary — {dates} [{DEMO|LIVE}]`
-2. Summary: **{n}** trades | Net PnL: **{+/-}${pnl}**
-3. Winners/losers table with counts + amounts
-4. `── Key Metrics ──` table: profit factor, expectancy, avg winner/loser, win/loss ratio, largest win/loss, max consec wins/losses
-5. `── Daily P&L ──` sparkline: ▅▃▁▆▇█▃ with values in parentheses
-6. `── By Instrument ──` table: instrument, trades, net PnL, win rate
-7. `── By Direction ──` Long vs Short with trades, win%, PnL, █ bars
-8. `── Costs ──` Trading fees + Funding + Total (% of gross win)
-9. `── Next Steps ──` 2-3 suggestions (SINGLE, RISK, PATTERN)
+1. Choose candle interval based on holding duration.
+2. Fetch candles from the required pre-entry buffer through trade close.
+3. Compute:
+   - `preEntryMovePct`
+   - `maePct`
+   - `mfePct`
+   - `capturePct`
+   - `regimeTag`
+   - `trendAlignment`
+   - `entryTimingTag`
+4. If candle coverage is incomplete, mark missing derived fields as `N/A` and
+   avoid overstating conclusions.
 
-#### SINGLE sections:
-1. `## Trade Review — {instId} [{DEMO|LIVE}]`
-2. Position table: direction, leverage, entry/exit, size, margin mode
-3. `── P&L Breakdown ──` table: price PnL, fees, funding, liq penalty, **net realized**
-4. `── Risk Metrics ──` R-multiple, initial risk, reward:risk, leverage risk %
-5. `── Price Action ──` simple ASCII chart with entry/exit/SL markers
-6. `── Execution ──` fills count, maker/taker %, slippage bps, close type
-7. `── Assessment ──` [+] strengths, [-] weaknesses, [!] warnings
-8. `── Next Steps ──`
+### Step 6: Compute review outputs
 
-#### RISK sections:
-1. Header, 2. Risk scores with ▓░ bars (overall / leverage / concentration / sizing / drawdown, each X/10),
-3. Leverage profile (avg, max, distribution by bucket), 4. Drawdown (max DD, duration, Sharpe, Sortino),
-5. Concentration by instrument, 6. Liquidation events, 7. [!] Recommendations, 8. Next Steps
+Use formulas from [references/formulas.md](references/formulas.md) plus the
+market-context rules.
 
-#### EXECUTION sections:
-1. Header, 2. Maker/taker breakdown with █ bars, 3. Fee impact (rebate vs cost, savings potential),
-4. Slippage analysis (entry/exit avg bps, worst), 5. Order type usage, 6. Recommendations
+Minimum `PERIOD` review content:
 
-#### COST sections:
-1. Header, 2. Summary (total, cost/volume bps, cost/PnL %), 3. Breakdown with █ bars (fees/funding/liq),
-4. Trading fee detail (maker rebate vs taker), 5. Funding impact, 6. By instrument, 7. Optimization tips
+1. Executive Summary
+2. Scorecard
+3. What Drove PnL
+4. What Hurt
+5. Market Context
+6. Behavior Patterns
+7. Action Adjustments
+8. Next Steps
 
-#### PATTERN sections:
-1. Header, 2. By instrument table (trades, PnL, win rate, PF), 3. By direction with █ bars,
-4. By leverage bucket, 5. By hold duration, 6. By session (Asian/European/US),
-7. Top 3 findings, 8. Insights [+][-][!]
+Required core metrics:
 
-#### JOURNAL:
-Markdown table: date, instrument, dir, lever, entry, exit, PnL, PnL%, duration. TOTAL row at bottom.
-On request: CSV or JSON. Always include all positions in time range.
+- total trades, winners, losers, break-even
+- net PnL, gross win, gross loss
+- win rate, profit factor, expectancy
+- average winner, average loser, win/loss ratio
+- largest win/loss
+- max consecutive wins/losses
+- total fees, total funding, total liquidation penalties, total costs
+- equity curve and max drawdown
+- instrument, direction, leverage, duration, and session breakdowns
+- market-context tags for the enriched subset
 
----
+### Step 7: Evidence rules
 
-**Concrete PERIOD example (follow this format):**
+- Every `[+]`, `[-]`, `[!]` claim must cite evidence:
+  - trade count plus at least one metric such as net PnL, win rate, profit
+    factor, cost ratio, drawdown burden, or MAE/MFE
+- Do not call something a pattern unless:
+  - it has at least 3 trades, or
+  - it represents at least 20% of the sample
+- If neither threshold is met, label it `低樣本` / `low confidence` or omit it
+- Rank findings by impact first:
+  - PnL contribution
+  - drawdown burden
+  - cost drag
+  - win-rate delta
+  - profit-factor delta
 
-## Period Summary — Mar 01 to Mar 07 [DEMO]
+### Step 8: Render markdown-first output
 
-**11** trades | Net PnL: **+$9,833.03**
+Follow [references/output-templates.md](references/output-templates.md).
 
-| | Count | Amount |
-|---|---|---|
-| Winners | 5 (45.5%) | +$11,179 |
-| Losers | 6 (54.5%) | -$1,346 |
+Formatting rules:
 
-`── Key Metrics ──────────────────────────────────`
+- Use headings, bullets, short tables, sparklines, and 10-character bars
+- Do NOT use full-width box-drawing layouts in main chat output
+- Do NOT put wide ledgers in the main chat response
+- Use `+` / `-` prefixes, `[+]`, `[-]`, `[!]`, and `低樣本` markers
+- Keep main chat optimized for narrow chat windows
 
-| Metric | Value |
-|--------|-------|
-| Profit Factor | **7.51** |
-| Expectancy | **+$893.91** / trade |
-| Avg Winner | +$2,235.86 |
-| Avg Loser | -$224.35 |
-| Largest Win | +$5,420.12 (BTC, Mar 03) |
-| Max Consec Win/Loss | 3 / 2 |
+## Optional Artifact Generation
 
-`── Daily P&L ────────────────────────────────────`
-▅▁▃▇█▂▃ (+1,200 -340 +680 +3,200 +5,420 -280 +553)
+When the user requests `完整報告`, `輸出 markdown 檔`, `匯出 CSV`, or `附圖`,
+and scripting is available:
 
-`── By Instrument ────────────────────────────────`
+1. Build a normalized review payload containing:
+   - `account`
+   - `period`
+   - `trades`
+   - `summary`
+   - `breakdowns`
+   - `insights`
+2. Write the payload to a temporary JSON file.
+3. Run:
 
-| Instrument | Trades | Net PnL | Win Rate |
-|---|---|---|---|
-| BTC-USDT-SWAP | 9 | **+$9,836.27** | 44% |
-| SOL-USDT-SWAP | 1 | +$0.98 | 100% |
-| ETH-USDT-SWAP | 1 | -$4.22 | 0% |
-
-`── By Direction ─────────────────────────────────`
-- **Long**: 7 trades, 57% win, **+$8,200** ████████████████████
-- **Short**: 4 trades, 25% win, **+$1,633** ████████
-
-`── Costs ────────────────────────────────────────`
-- Trading Fees: **-$45.67**
-- Funding Costs: **-$12.30**
-- Total: **-$57.97** (0.5% of gross win)
-
-`── Next Steps ───────────────────────────────────`
-→ "查看最大那筆BTC交易的詳情" (SINGLE)
-→ "檢查風險指標和回撤" (RISK)
-→ "分析做多做空的模式" (PATTERN)
-
----
-
-> Note: For extended per-mode template examples, see `references/output-templates.md` if file access is available.
-
-### Step 4: Recommend Continuations
-
-End every output with `── Next Steps ──` offering 2-3 suggested actions.
-Tailor to results (high costs → suggest COST; concentrated → suggest RISK).
-
----
-
-## Cross-Mode Drill-Down
-
-```
-PERIOD → SINGLE:    "詳細看那筆虧損的交易"
-PERIOD → RISK:      "風險指標如何？"
-PERIOD → PATTERN:   "有什麼交易模式？"
-SINGLE → EXECUTION: "這筆交易的執行品質怎樣？"
-RISK   → COST:      "費用明細是什麼？"
-PATTERN → SINGLE:   "最好/最差的那類交易詳情"
-Any    → JOURNAL:   "匯出這些交易記錄"
+```bash
+python "${CLAUDE_SKILL_DIR}/scripts/trade_review_assets.py" /tmp/okx-review.json --output-dir /tmp
 ```
 
-Carry context (time range, instrument filter) between modes automatically.
+4. Add `--svg` when the user requests `附圖`.
+5. Tell the user which files were generated.
 
----
+Generated artifacts:
+
+- `review-YYYYMMDD-YYYYMMDD.md`
+- `review-YYYYMMDD-YYYYMMDD.enriched.csv`
+- `review-YYYYMMDD-YYYYMMDD.svg` when requested
+
+Fallback:
+
+- If Python or file writing is unavailable, still deliver the full chat review.
+- If export is explicitly requested, return the markdown or CSV content inline in
+  fenced blocks and state that file generation was unavailable.
+
+## Mode-Specific Guidance
+
+### `SINGLE`
+
+- Always fetch fills, orders, and candles.
+- Compare the trade against the local market regime and entry timing.
+- Explain MAE, MFE, capture, execution quality, and whether the trade aligned
+  with or fought the observed trend.
+
+### `RISK`
+
+- Emphasize drawdown, leverage buckets, concentration, liquidation events, and
+  size discipline.
+- Use the same evidence rules as `PERIOD`.
+
+### `EXECUTION`
+
+- Emphasize maker/taker mix, slippage, fill fragmentation, and avoid purely
+  descriptive fee reporting.
+
+### `COST`
+
+- Show costs in absolute terms and as a drag against gross win or pre-cost PnL.
+
+### `PATTERN`
+
+- Focus on high-signal buckets only.
+- Suppress tiny or noisy segments.
+
+### `JOURNAL`
+
+- Default export format: enriched CSV.
+- If the user also asks for readable output, generate a markdown report artifact.
+
+## Cross-Mode Continuations
+
+Tailor the ending to the strongest follow-up path:
+
+- `PERIOD -> SINGLE`: inspect the largest loss, largest win, or worst capture
+- `PERIOD -> RISK`: inspect leverage, drawdown, or concentration risk
+- `PERIOD -> PATTERN`: inspect direction, session, or duration patterns
+- `SINGLE -> EXECUTION`: inspect fills and slippage
+- `RISK -> COST`: inspect funding or fee drag
+- `PATTERN -> JOURNAL`: export the enriched dataset
 
 ## Edge Cases
 
 | Case | Handling |
 |------|----------|
-| **MCP not connected** | Instruct: install `okx-trade-mcp`, add to MCP config, restart agent |
-| **Period > 90 days** | Warn: "OKX API 僅保留 3 個月數據。已自動調整至可用範圍。" |
-| **No trades found** | "該時段無已平倉交易。請嘗試擴大日期範圍或檢查篩選條件。" |
-| **Missing TP/SL** | R-Multiple = N/A. "此交易未設止損，建議所有倉位都設置止損。" |
-| **Spot trades** | positions-history 不含現貨。Use `spot_get_fills` with time range instead. |
-| **Liquidation event** | Flag with `[!]`. type=3/4 = full liq, type=1/2 = partial liq. |
-| **Demo vs Live unclear** | Default demo. Ask: "查看模擬帳戶還是真實帳戶？" |
-| **Auth failure** | "MCP 認證失敗。請檢查 ~/.okx/config.toml 配置。" |
-| **Pagination needed** | Paginate with `after` param. Cap at 10 pages (1000 items). |
+| No trades found | Tell the user the range has no closed trades and suggest widening the range |
+| Range too large | Paginate up to 10 pages, then warn and ask the user to narrow the range if signal quality will drop |
+| Missing candles | Mark market-context fields as `N/A` and avoid directional claims |
+| Missing stop loss | Set R-multiple to `N/A`; do not invent stop prices |
+| Spot trades | Use `spot_get_fills`; skip position-history-only assumptions |
+| Mixed spot and derivatives | Keep the record schema stable and note metrics that only apply to derivatives |
+| Demo vs live unclear | Default to demo and say so |
 
----
+## Output Standard
 
-## Assessment Guidelines
+The review should read like a trading coach's post-mortem:
 
-When providing trade assessments in SINGLE mode, evaluate:
+- concise summary first
+- evidence before opinion
+- high-impact findings before minor observations
+- specific adjustments instead of generic advice
 
-**Strengths [+]:**
-- Proper position sizing (risk <2% of equity)
-- Good risk/reward ratio (R-multiple >2.0)
-- Used limit orders for entry (lower fees)
-- Held through planned duration
-- Had stop-loss in place
-
-**Weaknesses [-]:**
-- No stop-loss set
-- Over-leveraged (>10x on volatile asset)
-- Loss exceeded initial risk plan
-- Market order exit left profit on table
-- Position size exceeded normal risk budget
-
-**Warnings [!]:**
-- Liquidation event (full or partial)
-- High funding costs relative to PnL
-- Counter-trend trade
-- Concentration risk (>50% exposure in one instrument)
-
----
-
-## Conversation Examples
-
-### Period Review
-```
-User: "這週做得怎樣？"
-Agent: [calls account_get_positions_history with limit: 100]
-Agent: [filters by last 7 days, computes all metrics]
-Agent: [formats PERIOD output with equity curve, metrics, instrument breakdown]
-Agent: "以上是你過去 7 天的交易績效。整體勝率 61%，利潤因子 2.25。
-        BTC 交易表現最強。你想深入查看哪筆交易，或者分析風險指標？"
-```
-
-### Single Trade Drill-Down
-```
-User: "詳細看一下那筆SOL的虧損"
-Agent: [calls account_get_positions_history with instId: SOL-USDT-SWAP]
-Agent: [calls swap_get_fills for position time range]
-Agent: [calls swap_get_orders for TP/SL data]
-Agent: [calls market_get_candles for price context]
-Agent: [formats SINGLE output with P&L breakdown, execution, assessment]
-```
-
-### Risk Check
-```
-User: "我的風險是不是太大了？"
-Agent: [calls account_get_positions_history, paginates all in last 30 days]
-Agent: [computes leverage distribution, drawdown, concentration, risk scores]
-Agent: [formats RISK output with score bars and recommendations]
-```
-
-### Export
-```
-User: "匯出上個月的交易記錄"
-Agent: [calls account_get_positions_history, paginates all for Feb 2026]
-Agent: [formats as CSV or structured table per user preference]
-```
+Do not return a shallow metric dump. Explain what mattered, why it mattered,
+and what behavior should change.
