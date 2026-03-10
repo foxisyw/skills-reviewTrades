@@ -2,6 +2,51 @@
 
 Append newest entries first. One entry per implementation session.
 
+## 2026-03-10 22:00 HKT
+- Objective: UX audit and fixes — 26 issues across 6 categories, prioritized by user impact.
+- Files changed:
+  - `SKILL.md` — Redesigned Step 9 reflection (compact 2-phase bilingual flow), expanded description triggers, added ambiguity fallback picker, first-use welcome, Data Safety section, demo/live confirmation, progress indicator, modifier discoverability.
+  - `references/discipline-journal.md` — Expanded enums (grid_dca, copy_signal, liquidation_bounce, trailing_stop, partial_close, forced_liquidation, liquidation_level, atr_volatility, sized_for_max_loss), added bilingual keyword mapping table, simplified period reflection to 3 fields, documented atomic write pattern.
+  - `references/output-templates.md` — Template 11 reduced to 4 columns, Template 12 unified Chinese severity labels with max-based composite score, Template 14 echoes back normalized answers, all Next Steps use "try saying:" format.
+  - `references/bias-detection.md` — Duration ratio uses median, capture rate regime-adjusted, revenge trading detects correlated assets, overconfidence has absolute leverage guard, FOMO uses volatility-adaptive window, composite score uses max()+mean().
+  - `scripts/trade_review_assets.py` — Updated normalize_reflection() with bilingual mappings, updated render_journal_section() for 4-column table, updated render_bias_report() with max-based composite and Chinese labels, added rebuild_index(), atomic_write_index(), import_journal(), backup_journal(), and CLI args --import-journal/--backup-journal/--journal-dir.
+  - `README.md` — Complete rewrite with detailed feature documentation.
+  - `.gitignore` — Added journal entries/snapshots exclusions.
+- Verification performed:
+  - `python3 -m py_compile scripts/trade_review_assets.py` — passed.
+  - Runtime import test: all new functions (normalize_reflection, import_journal, backup_journal, rebuild_index, atomic_write_index) verified importable and functional.
+- Open issues or follow-ups:
+  - No automated test harness for journal persistence, bias computation, or import/export.
+  - Bias thresholds need validation with real trade data.
+
+## 2026-03-10 16:00 HKT
+- Objective: Implement the 交易紀律小簿 (Trading Discipline Notebook) — a persistence layer for structured trade reflections, behavioral bias detection, and news/Twitter MCP integration.
+- Files changed:
+  - `SKILL.md` — Added 3 new modes (NOTEBOOK, BIAS, NEWS), Step 9 (Structured Reflection), 3 new modifiers, news/twitter MCP frontmatter, updated cross-mode continuations, updated edge cases, updated pre-flight.
+  - `references/discipline-journal.md` — New file. Storage schema, reflection enums, entry lifecycle, index rebuild rules, bias flag detection on entry, news context schema.
+  - `references/bias-detection.md` — New file. 7 bias algorithms (Loss Aversion, Revenge Trading, Overconfidence, FOMO, Emotional Stop-Loss, Disposition Effect, Overtrading) with formulas, thresholds, worked examples, confidence levels, composite scoring.
+  - `references/output-templates.md` — Added Templates 11-14 (Journal View, Bias Report, Macro Context, Reflection Confirmation).
+  - `scripts/trade_review_assets.py` — Added `JOURNAL_CSV_FIELDS`, `normalize_reflection()`, `detect_entry_bias_flags()`, `render_journal_section()`, `render_bias_report()`, `write_journal_csv()`, `--journal-index` and `--bias-report` CLI args. Made `input_json` optional for standalone journal/bias rendering.
+  - `data/discipline-journal/index.json` — New file. Empty initial index.
+  - `data/discipline-journal/entries/` — New directory.
+  - `data/discipline-journal/bias-snapshots/` — New directory.
+  - `tasks/dev-log.md` — This entry.
+- Behavior added/changed/removed:
+  - After Step 8, SINGLE and PERIOD reviews now offer a Step 9 structured reflection prompt.
+  - Reflections are persisted to JSON files with preliminary bias flags.
+  - NOTEBOOK mode reads the journal index and renders a summary view with sparklines and stats.
+  - BIAS mode runs 7 quantitative bias algorithms and reports composite scores.
+  - NEWS mode integrates with OpenNews and OpenTwitter MCPs for macro context (graceful degradation when unavailable).
+  - Python exporter can now render journal summaries and bias reports independently.
+- Verification performed:
+  - `python3 -m py_compile scripts/trade_review_assets.py` — passed.
+  - Reviewed all new templates for consistency with existing output conventions.
+  - Verified SKILL.md mode table, intent resolution, and cross-mode continuations are complete.
+- Open issues or follow-ups:
+  - News/Twitter MCPs require user installation and token configuration.
+  - Bias algorithms require real trade data to validate threshold calibration.
+  - No automated test harness for journal persistence or bias computation.
+
 ## 2026-03-10 10:25 HKT
 - Objective: Sync the redesign into the GitHub repo layout and update repository documentation and package metadata.
 - Files changed:

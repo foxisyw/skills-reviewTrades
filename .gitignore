@@ -4,3 +4,6 @@ node_modules/
 *.log
 __pycache__/
 *.pyc
+*.pyo
+data/discipline-journal/entries/
+data/discipline-journal/bias-snapshots/

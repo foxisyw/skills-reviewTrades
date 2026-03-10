@@ -1,247 +1,206 @@
 # OKX Trade Review Skill for Claude Code
 
-Markdown-first OKX trade review for Claude Code, backed by `okx-trade-mcp`.
+A comprehensive trade review and discipline tracking skill for [Claude Code](https://claude.com/claude-code). Connects to your OKX account via MCP, fetches closed trades, enriches them with market context, and delivers a structured post-mortem — all in the chat.
 
-This plugin is designed for exchange trade post-mortems in terminal-first or
-browserless environments. It fetches closed trade history, enriches selected
-trades with time-aligned market candles, explains what actually drove PnL, and
-can export artifacts for later analysis.
+Built for crypto traders who want honest, data-driven feedback on their execution without leaving the terminal.
 
-## What Changed in v2
+## What It Does
 
-- Markdown-first reporting for narrow chat windows
-- Deeper `複盤我的交易` workflow with market-context enrichment
-- Optional artifact export:
-  - long-form markdown report
-  - enriched CSV
-  - optional SVG overview
-- Persistent contributor logs in `tasks/`
-
-## Core Capabilities
-
-| Mode | Output |
-|------|--------|
-| `PERIOD` | Executive summary, scorecard, PnL drivers, drags, market context, behavior patterns, action adjustments |
-| `SINGLE` | One-trade deep dive with MAE/MFE, capture, regime, alignment, entry timing |
-| `RISK` | Drawdown, leverage, concentration, liquidation, position-sizing review |
-| `EXECUTION` | Maker/taker mix, slippage, fill quality, execution drag |
-| `COST` | Fees, funding, liquidation penalties, cost drag |
-| `PATTERN` | Instrument, direction, leverage, duration, and session patterns |
-| `JOURNAL` | Enriched CSV export and optional markdown/SVG artifacts |
-
-## Default Behavior
-
-When the user says:
-
-```text
-複盤我的交易
+```
+You: 複盤我的交易
+Skill: [fetches last 7 days from OKX] → analysis → reflection prompt → journal entry
 ```
 
-the skill defaults to:
+### 10 Review Modes
 
-- `demo` account
-- last 7 days
-- chat markdown only
-- `standard` depth
+| Mode | Purpose |
+|------|---------|
+| **PERIOD** | Review a date range — scorecard, drivers, drags, patterns, action items |
+| **SINGLE** | Deep dive into one trade — entry timing, MAE/MFE, capture rate, market regime |
+| **RISK** | Leverage, drawdown, concentration, liquidation proximity |
+| **EXECUTION** | Maker/taker mix, slippage, fill quality |
+| **COST** | Fee drag, funding costs, liquidation penalties |
+| **PATTERN** | Instrument, direction, session, duration, and leverage patterns |
+| **JOURNAL** | Export trades as enriched CSV or markdown report |
+| **NOTEBOOK** | View and search your discipline journal |
+| **BIAS** | Detect 7 behavioral biases from accumulated reflections |
+| **NEWS** | Overlay macro news and Twitter sentiment on a review |
 
-Depth policy:
+### Key Features
 
-- `<= 20 trades`: enrich every trade with market context
-- `21-100 trades`: enrich top 10 impact trades and summarize the rest
-- `> 100 trades`: warn and fall back to aggregate review plus top 12 trades
+**Market Context Enrichment**
+Every trade gets tagged with the local price regime (`trend_up`, `trend_down`, `range`), trend alignment, and entry timing (`chase`, `pullback`, `neutral`). MAE, MFE, and capture rate show whether a loss was a bad idea or bad execution.
 
-Supported modifiers:
+**Discipline Journal (紀律小簿)**
+After each review, a compact reflection prompt asks 3 quick questions (entry reason, emotion, self-rating). Answers are normalized into enums, stored as JSON, and accumulate over time. Supports bilingual input — answer in Chinese or English.
 
-- `快速複盤`
-- `深度逐筆`
-- `完整報告`
-- `輸出 markdown 檔`
-- `匯出 CSV`
-- `附圖`
-- `只看摘要`
+**7-Bias Detection Engine**
+Once you have 5+ journal entries, run `偏差分析` to detect:
+- **Loss Aversion** — holding losers too long, cutting winners short (uses median duration ratio, regime-adjusted capture thresholds)
+- **Revenge Trading** — re-entry after loss within time window (detects correlated-asset revenge: BTC loss → ETH re-entry)
+- **Overconfidence** — leverage escalation after winning streaks (with absolute leverage guard: ≤5x is always safe)
+- **FOMO** — chase entries clustered in time (volatility-adaptive window: 4h base, 6h during >3% moves)
+- **Emotional Stop-Loss** — exiting at maximum pain without a plan
+- **Disposition Effect** — relief-selling small winners while bag-holding losers
+- **Overtrading** — frequency-performance degradation, death by a thousand cuts
 
-## What the Review Looks Like
+Each bias reports severity (健康/需注意/嚴重), confidence level, specific evidence, and one actionable suggestion. The composite score uses `max()` for the headline (no misleading averages).
 
-The main chat response is structured as:
+**Artifact Generation**
+Request `完整報告`, `匯出 CSV`, or `附圖` to generate:
+- Enriched markdown report with deep dives
+- CSV with all normalized fields for external analysis
+- SVG overview chart (equity curve, drawdown, contribution bars)
 
-1. `Executive Summary`
-2. `Scorecard`
-3. `What Drove PnL`
-4. `What Hurt`
-5. `Market Context`
-6. `Behavior Patterns`
-7. `Action Adjustments`
-8. `Next Steps`
+## Project Structure
 
-This replaces the older wide ASCII box layout. The goal is readability inside
-Claude Code, OpenClaw, and other narrow chat surfaces.
+```
+.
+├── SKILL.md                          # Main skill definition (modes, workflow, prompts)
+├── references/
+│   ├── bias-detection.md             # 7 bias algorithms with thresholds and worked examples
+│   ├── discipline-journal.md         # Journal schema, enums, persistence rules
+│   ├── formulas.md                   # Statistical formulas (win rate, Sharpe, Kelly, etc.)
+│   ├── market-context.md             # Candle enrichment: regime, MAE/MFE, capture rate
+│   ├── mcp-tools.md                  # OKX MCP tool reference and pagination patterns
+│   └── output-templates.md           # 14 markdown templates for all output types
+├── scripts/
+│   └── trade_review_assets.py        # Python artifact generator (markdown, CSV, SVG, journal)
+├── data/
+│   └── discipline-journal/
+│       ├── index.json                # Lean index for fast filtering
+│       ├── entries/                   # One JSON file per reflection
+│       └── bias-snapshots/           # Periodic bias analysis cache
+└── tasks/
+    ├── todo.md
+    ├── lessons.md
+    └── dev-log.md
+```
 
-## Market-Context Enrichment
+## Prerequisites
 
-For selected trades, the skill uses `market_get_candles` to compute:
+1. **Claude Code** — [install guide](https://docs.anthropic.com/en/docs/claude-code)
+2. **OKX MCP Server** — `okx-trade-mcp` connected with account module enabled. Configure credentials in `~/.okx/config.toml`.
+3. **Python 3.10+** — for artifact generation (markdown, CSV, SVG exports). No external packages required.
 
-- `preEntryMovePct`
-- `maePct`
-- `mfePct`
-- `capturePct`
-- `regimeTag`
-- `trendAlignment`
-- `entryTimingTag`
+### Optional MCP Servers
 
-These fields are used to distinguish:
+- **OpenNews MCP** — macro news context ([opennews-mcp](https://github.com/6551Team/opennews-mcp))
+- **OpenTwitter MCP** — KOL sentiment ([opentwitter-mcp](https://github.com/6551Team/opentwitter-mcp))
+- Get tokens at [6551.io/mcp](https://6551.io/mcp)
 
-- good idea vs bad execution
-- aligned vs countertrend trades
-- chased entries vs pullback entries
-- exits that captured too little of the available move
+## Installation
 
-## Export Artifacts
-
-When scripting is available and the user asks for exports, the skill can
-generate:
-
-- `review-YYYYMMDD-YYYYMMDD.md`
-- `review-YYYYMMDD-YYYYMMDD.enriched.csv`
-- `review-YYYYMMDD-YYYYMMDD.svg`
-
-The exporter lives at:
-
-- [skills/okx-trade-review/scripts/trade_review_assets.py](./skills/okx-trade-review/scripts/trade_review_assets.py)
-
-It accepts normalized review JSON and writes artifacts without third-party
-Python dependencies.
-
-### Example exporter usage
+Copy this skill directory into your Claude Code skills folder, or clone this repo and symlink it:
 
 ```bash
-python skills/okx-trade-review/scripts/trade_review_assets.py /tmp/okx-review.json --output-dir /tmp/review-out --svg
+git clone https://github.com/foxisyw/skills-reviewTrades.git
+# Then add the skill path to your Claude Code configuration
 ```
 
-If Python or file writing is unavailable, the skill should still return the full
-markdown review in chat and can fall back to inline fenced CSV/markdown content.
+## Usage
 
-## Quick Start
+### Trigger Phrases
 
-### Prerequisites
+The skill activates on a wide range of natural-language triggers:
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-- Node.js 18+
-- OKX API key with read-only permissions
+| Language | Examples |
+|----------|----------|
+| Chinese | `複盤我的交易`, `看交易`, `我虧了`, `記錄一下`, `我想反思`, `偏差分析`, `交易小簿` |
+| English | `review my trades`, `check my BTC`, `why did I lose`, `bias analysis`, `discipline journal` |
 
-### 1. Install the MCP server
+### Modifiers
+
+| Modifier | Effect |
+|----------|--------|
+| `快速複盤` | Skip per-trade candle enrichment |
+| `深度逐筆` | Enrich every trade (up to 60) |
+| `完整報告` | Generate long markdown artifact |
+| `匯出 CSV` | Generate enriched CSV |
+| `附圖` | Generate overview SVG chart |
+| `只看摘要` | Executive summary only |
+| `最近 N 條` | Limit notebook view to N entries |
+| `搜尋 {keyword}` | Filter journal by keyword |
+| `偏差報告` | Full bias analysis report |
+
+### Reflection Flow
+
+After each SINGLE or PERIOD review, the skill offers a **2-phase reflection**:
+
+**Phase 1** (always shown — answer in one message):
+1. Entry reason (breakout / indicator / fomo / grid-dca / ...)
+2. Emotion (calm / fomo / fear / revenge / ...)
+3. Self-rating (1-5)
+
+**Phase 2** (optional — type `done` to skip):
+4. Stop-loss basis (preset / trailing / liquidation-level / atr / ...)
+5. Exit reason (stop-loss / trailing-stop / partial-close / forced-liquidation / ...)
+6. Lesson learned (free text)
+
+Type `跳過` or `skip` to skip entirely. Partial answers are saved — you don't have to answer everything.
+
+### Python Exporter CLI
 
 ```bash
-npm install -g okx-trade-mcp
+# Generate review artifacts from normalized JSON
+python scripts/trade_review_assets.py /tmp/review.json --output-dir /tmp --svg
+
+# Render journal view
+python scripts/trade_review_assets.py --journal-index data/discipline-journal/index.json --output-dir /tmp
+
+# Render bias report
+python scripts/trade_review_assets.py --bias-report data/discipline-journal/bias-snapshots/2026-03-10.json --output-dir /tmp
+
+# Backup journal to external directory
+python scripts/trade_review_assets.py --backup-journal ~/backups --journal-dir data/discipline-journal
+
+# Import journal from previously exported CSV
+python scripts/trade_review_assets.py --import-journal ~/backups/journal.csv --journal-dir data/discipline-journal
 ```
 
-### 2. Configure API credentials
+## Data Safety
 
-```bash
-mkdir -p ~/.okx
-cat > ~/.okx/config.toml << 'EOF'
-[demo]
-api_key = "your-api-key"
-secret_key = "your-secret-key"
-passphrase = "your-passphrase"
-EOF
-```
+- Journal data is **device-local** — stored in `data/discipline-journal/`. It does not sync across machines.
+- Before updating or reinstalling this skill, **back up the `data/` directory**.
+- Index writes use an **atomic tmp+rename pattern** to prevent corruption from interrupted writes.
+- If `index.json` becomes corrupted, it is **automatically rebuilt** from individual entry files.
+- Journal entries contain personal reflections (emotions, self-criticism). Ensure your machine is password-protected.
 
-### 3. Install the plugin
+## Formulas & Metrics
 
-```bash
-claude plugin add foxisyw/skills-reviewTrades
-```
+The skill computes and reports:
 
-### 4. Use it
+| Category | Metrics |
+|----------|---------|
+| Core | Win rate, profit factor, expectancy, R-multiple, SQN |
+| Risk | Max drawdown, Sharpe/Sortino/Calmar ratios, leverage distribution, liquidation proximity |
+| Execution | Slippage, maker/taker ratio, fee impact |
+| Market Context | Pre-entry move, MAE, MFE, capture rate, regime tag, trend alignment, entry timing |
+| Behavior | 7 bias scores with severity, confidence, and evidence |
 
-Examples:
+All formulas are documented in [`references/formulas.md`](references/formulas.md) and [`references/market-context.md`](references/market-context.md).
 
-```text
-複盤我的交易
-```
+## Design Decisions
 
-```text
-review my trades this week
-```
-
-```text
-複盤我的交易，匯出 CSV
-```
-
-```text
-深度逐筆複盤這個月的 BTC 和 ETH 交易
-```
-
-## Trigger Phrases
-
-English:
-
-- `review my trades`
-- `how did I do this week`
-- `review my BTC trade`
-- `risk assessment`
-- `export trades`
-
-中文:
-
-- `複盤我的交易`
-- `這週績效如何`
-- `複盤那筆交易`
-- `風險評估`
-- `匯出交易記錄`
+- **Markdown-first** — main chat output works without Python, file writing, or image preview. Artifacts are optional.
+- **Evidence-backed** — every `[+]`, `[-]`, `[!]` claim must cite trade count + at least one metric. Patterns require ≥3 trades or ≥20% of sample.
+- **Bilingual** — prompts, enums, and trigger phrases work in both Traditional Chinese and English. Language auto-detected from user's last message.
+- **Narrow-chat optimized** — tables max 4 columns in chat. Wide ledgers go to exported artifacts only.
+- **Crypto-calibrated** — bias thresholds account for 24/7 markets, 5-min to multi-week holding periods, correlated-asset trading, and leverage norms.
 
 ## Safety
 
-- Demo by default
-- Read-only review only
-- Clear `[DEMO]` / `[LIVE]` labeling
-- Warns when requests exceed OKX's approximate 3-month retention window
-
-## Repository Structure
-
-```text
-skills-reviewTrades/
-├── .claude-plugin/
-│   └── plugin.json
-├── .mcp.json
-├── skills/
-│   └── okx-trade-review/
-│       ├── SKILL.md
-│       ├── references/
-│       │   ├── formulas.md
-│       │   ├── market-context.md
-│       │   ├── mcp-tools.md
-│       │   └── output-templates.md
-│       └── scripts/
-│           └── trade_review_assets.py
-├── tasks/
-│   ├── dev-log.md
-│   ├── lessons.md
-│   └── todo.md
-├── CLAUDE.md
-├── LICENSE
-├── README.md
-└── package.json
-```
+- Demo account by default — explicit confirmation required for live
+- Read-only review — the skill never executes trades
+- Clear `[DEMO]` / `[LIVE]` labeling on all outputs
+- Warns when requests exceed OKX's ~3-month data retention
 
 ## Development Logs
 
-This repo now keeps project-local implementation records:
-
-- [tasks/todo.md](./tasks/todo.md): active implementation checklist and review notes
-- [tasks/dev-log.md](./tasks/dev-log.md): append-only session log of repo changes
-- [tasks/lessons.md](./tasks/lessons.md): mistakes, bugs, and prevention rules
-
-These files are meant for contributors, not end users.
-
-## Limitations
-
-- OKX historical retention is limited
-- Pagination is capped in the skill flow
-- Spot review has different data availability from derivatives
-- The exporter expects normalized review JSON from the calling agent
-- Current verification is sample-based; there is no formal test suite yet
+- [tasks/todo.md](./tasks/todo.md) — active implementation checklist
+- [tasks/dev-log.md](./tasks/dev-log.md) — append-only session log
+- [tasks/lessons.md](./tasks/lessons.md) — mistakes, bugs, and prevention rules
 
 ## License
 
-[Apache-2.0](./LICENSE)
+MIT
