@@ -9,14 +9,21 @@ description: >
   check market news impact (新聞, macro news), or export trade data (匯出, CSV).
   Also triggers for single trade deep dives, risk review, execution quality,
   cost analysis, and pattern detection.
-allowed-tools: >
-  Read, Write, Bash, Bash(python:*), Bash(python3:*),
-  mcp__okx-DEMO-simulated-trading__*,
-  mcp__okx-LIVE-real-money__*,
-  mcp__opennews__*,
-  mcp__opentwitter__*
+required-capabilities:
+  - file-read
+  - file-write
+  - shell-exec
+  - python
+  - mcp
+mcp-servers:
+  required:
+    - okx-DEMO-simulated-trading
+    - okx-LIVE-real-money
+  optional:
+    - opennews
+    - opentwitter
 metadata:
-  version: "3.0.0"
+  version: "3.1.0"
   newsMcpServer: "opennews"
   twitterMcpServer: "opentwitter"
 requires: okx-trade-mcp MCP server connected with account module enabled.
@@ -32,6 +39,17 @@ trade, and provide concrete, evidence-backed adjustments.
 
 You do NOT execute trades. You do NOT promise future performance. You do NOT
 give forward-looking trade calls.
+
+## Environment
+
+`${SKILL_DIR}` refers to the root directory of this skill installation (the
+directory containing this SKILL.md file).
+
+| Platform | Resolution |
+|----------|-----------|
+| Claude Code | `${SKILL_DIR}` (auto-injected) |
+| OpenClaw | The skill's root directory |
+| Generic agent | Set `SKILL_DIR` to the directory containing SKILL.md |
 
 ## Language and Output Defaults
 
@@ -54,12 +72,14 @@ give forward-looking trade calls.
 
 1. Call `system_get_capabilities`.
 2. Confirm the OKX MCP server is connected and `authenticated: true`.
-3. If MCP is missing, instruct the user to install and configure
+3. If MCP tool invocation is unavailable on your platform, verify connectivity
+   by calling `account_get_positions_history` with `limit: 1`.
+4. If MCP is missing, instruct the user to install and configure
    `okx-trade-mcp`.
-4. If auth is missing, instruct the user to configure `~/.okx/config.toml`.
-5. Warn when the user requests data older than 90 days:
+5. If auth is missing, instruct the user to configure `~/.okx/config.toml`.
+6. Warn when the user requests data older than 90 days:
    `OKX API 僅保留約 3 個月歷史資料，已自動裁切至可用範圍。`
-6. Detect news/twitter MCP servers:
+7. Detect news/twitter MCP servers:
    - Try to detect `opennews` and `opentwitter` MCP availability.
    - Set `newsAvailable` / `twitterAvailable` flags.
    - Never block the review workflow due to missing news/twitter MCPs.
@@ -67,7 +87,7 @@ give forward-looking trade calls.
 
 ## Data Safety
 
-- Journal data is stored at `${CLAUDE_SKILL_DIR}/data/discipline-journal/`.
+- Journal data is stored at `${SKILL_DIR}/data/discipline-journal/`.
 - This is device-local. It does NOT sync across machines.
 - Before updating or reinstalling this skill, back up the `data/` directory.
 - On first journal write, remind the user:
@@ -465,7 +485,7 @@ and scripting is available:
 3. Run:
 
 ```bash
-python "${CLAUDE_SKILL_DIR}/scripts/trade_review_assets.py" /tmp/okx-review.json --output-dir /tmp
+python "${SKILL_DIR}/scripts/trade_review_assets.py" /tmp/okx-review.json --output-dir /tmp
 ```
 
 4. Add `--svg` when the user requests `附圖`.

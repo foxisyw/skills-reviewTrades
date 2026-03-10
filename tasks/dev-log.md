@@ -2,6 +2,32 @@
 
 Append newest entries first. One entry per implementation session.
 
+## 2026-03-10 — Platform-agnostic migration (v3.1.0)
+- Objective: Make the skill work on any MCP-capable LLM agent, not just Claude Code.
+- Files changed:
+  - `SKILL.md` — Replaced `allowed-tools` frontmatter with generic `required-capabilities` + `mcp-servers`. Added Environment section with `${SKILL_DIR}` resolution table. Replaced `${CLAUDE_SKILL_DIR}` → `${SKILL_DIR}`. Added pre-flight MCP fallback step. Bumped to v3.1.0.
+  - `.claude-plugin/plugin.json` — Fixed `skills` path from `["./skills/"]` to `["./"]` (was loading old v2.0 copy). Bumped to v3.1.0.
+  - `CLAUDE.md` — De-branded from "Claude Code plugin" to universal project description. Added export layer to architecture.
+  - `README.md` — De-branded. Changed prerequisites from "Claude Code" to "Any MCP-capable LLM agent". Added platform setup links. Updated project structure (added `platforms/`, removed `skills/`). Added "Platform-agnostic" design decision.
+  - `package.json` — Removed `claude`, `claude-code-plugin` keywords. Added `llm-agent`, `multi-platform`. Updated `files` array (added `platforms/`, `references/`, `scripts/`; removed `.claude-plugin/`, `skills/`). Bumped to v3.1.0.
+  - `platforms/claude-code/README-setup.md` — New. Claude Code-specific setup guide.
+  - `platforms/openclaw/README-setup.md` — New. OpenClaw setup guide.
+  - `platforms/generic/README-setup.md` — New. Generic agent setup guide.
+  - `skills/okx-trade-review/` — Deleted. Old v2.0 duplicate.
+- Behavior added/changed/removed:
+  - Skill is now platform-agnostic. All Claude Code coupling isolated to `platforms/claude-code/` and `.claude-plugin/`.
+  - `${SKILL_DIR}` is the canonical env var; `${CLAUDE_SKILL_DIR}` still works on Claude Code via the Environment resolution table.
+  - Pre-flight now includes a connectivity fallback for platforms without `system_get_capabilities`.
+- Verification performed:
+  - `python3 -m py_compile scripts/trade_review_assets.py` — passed.
+  - SKILL.md YAML frontmatter valid — no `allowed-tools` or `CLAUDE_SKILL_DIR` remain.
+  - `grep -r "CLAUDE_SKILL_DIR"` returns zero matches outside `platforms/claude-code/`.
+  - `grep -r "claude-code-plugin"` returns zero matches outside `platforms/claude-code/`.
+  - `.claude-plugin/plugin.json` `skills` field points to `["./"]`.
+  - `skills/okx-trade-review/` directory no longer exists.
+- Open issues or follow-ups:
+  - OpenClaw and generic agent setup guides need validation with actual platform users.
+
 ## 2026-03-10 22:00 HKT
 - Objective: UX audit and fixes — 26 issues across 6 categories, prioritized by user impact.
 - Files changed:

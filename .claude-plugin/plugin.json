@@ -1,8 +1,8 @@
 {
   "name": "okx-trade-review",
-  "version": "2.0.0",
-  "description": "Deep markdown-first OKX trade review via MCP. Enriches trades with market context, explains PnL drivers, and can export markdown, CSV, and SVG artifacts.",
-  "skills": ["./skills/"],
+  "version": "3.1.0",
+  "description": "OKX trade review skill with discipline tracking and bias detection",
+  "skills": ["./"],
   "mcpServers": "./.mcp.json",
   "keywords": ["skills", "okx", "trading", "review", "post-mortem", "mcp", "複盤"]
 }

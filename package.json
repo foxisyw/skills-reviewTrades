@@ -1,6 +1,6 @@
 {
   "name": "okx-trade-review-skill",
-  "version": "2.0.0",
+  "version": "3.1.0",
   "description": "Deep markdown-first OKX trade review skill with market-context enrichment and export artifacts",
   "keywords": [
     "okx",
@@ -8,8 +8,8 @@
     "mcp",
     "skill",
     "post-mortem",
-    "claude",
-    "claude-code-plugin"
+    "llm-agent",
+    "multi-platform"
   ],
   "license": "Apache-2.0",
   "repository": {
@@ -19,7 +19,9 @@
   "files": [
     ".claude-plugin/",
     ".mcp.json",
-    "skills/",
+    "platforms/",
+    "references/",
+    "scripts/",
     "tasks/",
     "README.md",
     "LICENSE"

@@ -1,6 +1,7 @@
 # OKX Trade Review Skill
 
-This is a Claude Code plugin that provides structured post-mortem analysis (交易複盤) of OKX trading history.
+Structured post-mortem analysis (交易複盤) of OKX trading history for any
+MCP-capable LLM agent.
 
 ## Skills
 
@@ -11,7 +12,8 @@ This is a Claude Code plugin that provides structured post-mortem analysis (交�
 ## Architecture
 
 - **Data layer**: `okx-trade-mcp` — MCP server providing OKX API access (installed separately)
-- **Intelligence layer**: This plugin — SKILL.md with reference files for formulas and output formatting
+- **Intelligence layer**: SKILL.md with reference files for formulas and output formatting
+- **Export layer**: Python script for markdown, CSV, and SVG artifacts
 
 ## MCP Server
 

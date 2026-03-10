@@ -1,8 +1,8 @@
-# OKX Trade Review Skill for Claude Code
+# OKX Trade Review Skill
 
-A comprehensive trade review and discipline tracking skill for [Claude Code](https://claude.com/claude-code). Connects to your OKX account via MCP, fetches closed trades, enriches them with market context, and delivers a structured post-mortem — all in the chat.
+A comprehensive trade review and discipline tracking skill for any MCP-capable LLM agent. Connects to your OKX account via MCP, fetches closed trades, enriches them with market context, and delivers a structured post-mortem — all in the chat.
 
-Built for crypto traders who want honest, data-driven feedback on their execution without leaving the terminal.
+Built for crypto traders who want honest, data-driven feedback on their execution.
 
 ## What It Does
 
@@ -66,6 +66,10 @@ Request `完整報告`, `匯出 CSV`, or `附圖` to generate:
 │   └── output-templates.md           # 14 markdown templates for all output types
 ├── scripts/
 │   └── trade_review_assets.py        # Python artifact generator (markdown, CSV, SVG, journal)
+├── platforms/
+│   ├── claude-code/README-setup.md   # Claude Code setup guide
+│   ├── openclaw/README-setup.md      # OpenClaw setup guide
+│   └── generic/README-setup.md       # Generic agent setup guide
 ├── data/
 │   └── discipline-journal/
 │       ├── index.json                # Lean index for fast filtering
@@ -79,7 +83,7 @@ Request `完整報告`, `匯出 CSV`, or `附圖` to generate:
 
 ## Prerequisites
 
-1. **Claude Code** — [install guide](https://docs.anthropic.com/en/docs/claude-code)
+1. **An LLM agent with MCP support** — Claude Code, OpenClaw, Lark, or any MCP-capable agent
 2. **OKX MCP Server** — `okx-trade-mcp` connected with account module enabled. Configure credentials in `~/.okx/config.toml`.
 3. **Python 3.10+** — for artifact generation (markdown, CSV, SVG exports). No external packages required.
 
@@ -91,12 +95,15 @@ Request `完整報告`, `匯出 CSV`, or `附圖` to generate:
 
 ## Installation
 
-Copy this skill directory into your Claude Code skills folder, or clone this repo and symlink it:
-
 ```bash
 git clone https://github.com/foxisyw/skills-reviewTrades.git
-# Then add the skill path to your Claude Code configuration
 ```
+
+Then follow the setup guide for your platform:
+
+- **Claude Code**: [platforms/claude-code/README-setup.md](platforms/claude-code/README-setup.md)
+- **OpenClaw**: [platforms/openclaw/README-setup.md](platforms/openclaw/README-setup.md)
+- **Generic agent**: [platforms/generic/README-setup.md](platforms/generic/README-setup.md)
 
 ## Usage
 
@@ -187,6 +194,7 @@ All formulas are documented in [`references/formulas.md`](references/formulas.md
 - **Bilingual** — prompts, enums, and trigger phrases work in both Traditional Chinese and English. Language auto-detected from user's last message.
 - **Narrow-chat optimized** — tables max 4 columns in chat. Wide ledgers go to exported artifacts only.
 - **Crypto-calibrated** — bias thresholds account for 24/7 markets, 5-min to multi-week holding periods, correlated-asset trading, and leverage norms.
+- **Platform-agnostic** — works on any MCP-capable LLM agent. Platform-specific setup is isolated in `platforms/`.
 
 ## Safety
 
